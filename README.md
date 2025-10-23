@@ -217,3 +217,77 @@ python shipper/shipper_status.py
   }
 }
 ```
+
+## ⚙️ Log Processor
+
+The processor consumes from Kafka, parses logs, and indexes to Elasticsearch.
+
+### Usage
+```bash
+# Start processor (foreground)
+python processor/processor.py
+
+# Start processor (background)
+./scripts/start-processor.sh
+
+# Stop processor
+./scripts/stop-processor.sh
+```
+
+### Complete Pipeline
+```bash
+# Start entire pipeline
+./scripts/start-pipeline.sh
+
+# Check status
+./scripts/pipeline-status.sh
+
+# Stop entire pipeline
+./scripts/stop-pipeline.sh
+```
+
+### Pipeline Flow
+```
+Logs → Shipper → Kafka → Processor → Elasticsearch → Kibana
+```
+
+### Viewing Logs
+
+**Elasticsearch API:**
+```bash
+# Count logs
+curl http://localhost:9200/logs-*/_count
+
+# Search logs
+curl -X GET "http://localhost:9200/logs-*/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "query": { "match": { "level": "ERROR" } },
+  "size": 10
+}
+'
+```
+
+**Kibana UI:**
+```bash
+open http://localhost:5601
+# Go to Discover → Create index pattern: logs-*
+```
+
+### Document Structure
+```json
+{
+  "_id": "uuid",
+  "timestamp": "2025-10-23 15:30:45",
+  "level": "ERROR",
+  "service": "payment-service",
+  "message": "Database connection timeout",
+  "source": {
+    "hostname": "laptop",
+    "file": "sample_logs/app.log"
+  },
+  "extra_fields": {
+    "error_code": "E503"
+  },
+  "ingested_at": "2025-10-23T15:30:46.123Z"
+}
+```
