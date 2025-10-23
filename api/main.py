@@ -15,7 +15,7 @@ sys.path.insert(0, str(project_root))
 from api.config import API_TITLE, API_VERSION, API_DESCRIPTION, API_HOST, API_PORT
 from api.models.log import HealthResponse
 from api.utils.elasticsearch_client import es_client
-from api.routes import search
+from api.routes import search, metrics
 
 # Configure logging
 logger.remove()
@@ -33,7 +33,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +41,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(search.router)
+app.include_router(metrics.router)
 
 
 @app.on_event("startup")
@@ -68,7 +69,11 @@ async def root():
         "endpoints": {
             "search": "/api/v1/logs/search",
             "recent": "/api/v1/logs/recent",
-            "get_by_id": "/api/v1/logs/{id}"
+            "get_by_id": "/api/v1/logs/{id}",
+            "metrics_overview": "/api/v1/metrics/overview",
+            "service_metrics": "/api/v1/metrics/service/{name}",
+            "system_metrics": "/api/v1/metrics/system",
+            "timeseries": "/api/v1/metrics/timeseries"
         }
     }
 

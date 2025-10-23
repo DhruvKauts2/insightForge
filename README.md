@@ -462,3 +462,37 @@ curl "http://localhost:8000/api/v1/logs/recent?limit=10"
 ./scripts/test-api.sh
 ```
 
+
+### Metrics Endpoints
+
+#### Metrics Overview
+```bash
+GET /api/v1/metrics/overview?time_range=1h
+```
+
+Returns: Total logs, logs/minute, distribution by level/service, error rate
+
+#### Service Metrics
+```bash
+GET /api/v1/metrics/service/{service_name}?time_range=1h
+```
+
+Returns: Service-specific metrics and top error messages
+
+#### System Metrics
+```bash
+GET /api/v1/metrics/system?time_range=1h
+```
+
+Returns: Comprehensive system-wide metrics with per-service breakdown
+
+#### Time Series Data
+```bash
+GET /api/v1/metrics/timeseries?interval=5m&time_range=1h&service=payment-service
+```
+
+Returns: Log counts over time for charting/visualization
+
+**Supported time ranges:** 5m, 15m, 30m, 1h, 6h, 12h, 24h, 7d, 30d  
+**Supported intervals:** 1m, 5m, 15m, 30m, 1h
+

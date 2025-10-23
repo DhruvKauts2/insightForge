@@ -55,3 +55,26 @@ for log in data['logs']:
 echo ""
 
 echo "✅ API tests complete!"
+
+# Test 6: Metrics overview
+echo "Test 6: Metrics overview"
+curl -s "$API_URL/api/v1/metrics/overview?time_range=1h" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+print(f'Total logs: {data[\"total_logs\"]}')
+print(f'Logs/min: {data[\"logs_per_minute\"]}')
+print(f'Error rate: {data[\"error_rate\"]}%')
+print(f'By level: {data[\"by_level\"]}')
+"
+echo ""
+
+# Test 7: System metrics
+echo "Test 7: System metrics"
+curl -s "$API_URL/api/v1/metrics/system?time_range=1h" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+print(f'Total services: {data[\"total_services\"]}')
+print(f'Logs/second: {data[\"logs_per_second\"]}')
+print(f'Services: {[s[\"service\"] for s in data[\"metrics_by_service\"]]}')
+"
+echo ""
