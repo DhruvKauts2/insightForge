@@ -596,3 +596,14 @@ cat backups/logflow-20251024-120000.sql | docker compose exec -T postgres psql -
 docker compose exec postgres psql -U logflow -d logflow -c "\l+"
 ```
 
+
+### Known Limitations
+
+**PostgreSQL External Access:**
+Currently, Python scripts outside Docker cannot connect to PostgreSQL due to role authentication. 
+
+**Workarounds:**
+1. Run scripts inside Docker container
+2. Use SQL scripts directly via `./scripts/manage-db.sh shell`
+3. For production, deploy alert engine inside Docker
+
