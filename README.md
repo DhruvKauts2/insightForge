@@ -118,3 +118,63 @@ Your Name - [GitHub](https://github.com/yourusername)
 
 **Status**: 🚧 In Development
 **Current Phase**: Infrastructure Setup
+
+## 📝 Log Generator
+
+Generate realistic application logs for testing:
+
+### Basic Usage
+```bash
+# Generate text logs (default)
+python shipper/generate_logs.py
+
+# Generate JSON logs
+python shipper/generate_logs.py --format json
+
+# Custom rate (10 logs/second)
+python shipper/generate_logs.py --rate 10
+
+# Custom burst interval (every 60 seconds)
+python shipper/generate_logs.py --burst-interval 60
+```
+
+### Background Generation
+```bash
+# Start generator in background
+./scripts/generate-logs.sh
+
+# Stop background generator
+./scripts/stop-logs.sh
+```
+
+### Log Format
+
+**Text format:**
+```
+2025-10-23 14:32:15 INFO [payment-service] Payment completed for order order_45231
+```
+
+**JSON format:**
+```json
+{
+  "timestamp": "2025-10-23 14:35:22",
+  "level": "ERROR",
+  "service": "payment-service",
+  "message": "Payment gateway unavailable"
+}
+```
+
+### Log Levels Distribution
+
+- INFO: 70%
+- WARN: 15%
+- ERROR: 10%
+- DEBUG: 5%
+
+### Services
+
+- payment-service
+- auth-service
+- user-service
+- order-service
+- inventory-service
