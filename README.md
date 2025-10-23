@@ -496,3 +496,103 @@ Returns: Log counts over time for charting/visualization
 **Supported time ranges:** 5m, 15m, 30m, 1h, 6h, 12h, 24h, 7d, 30d  
 **Supported intervals:** 1m, 5m, 15m, 30m, 1h
 
+
+## 🗄️ Database Management
+
+LogFlow uses PostgreSQL for persistent storage of users, alerts, and configuration.
+
+### Database Schema
+
+**Tables:**
+- **users** - User accounts and authentication
+- **alert_rules** - Alert rule configurations
+- **triggered_alerts** - Alert history and status
+- **system_config** - System-wide settings
+
+### Quick Commands
+```bash
+# Initialize database (first time setup)
+./scripts/manage-db.sh init
+
+# Open PostgreSQL shell
+./scripts/manage-db.sh shell
+
+# Create backup
+./scripts/manage-db.sh backup
+
+# Reset database (⚠️ deletes all data!)
+./scripts/manage-db.sh reset
+```
+
+### Default Credentials
+
+After initialization, a default admin user is created:
+
+- **Username:** `admin`
+- **Password:** `admin123`
+- **Email:** `admin@logflow.local`
+
+⚠️ **Change these credentials in production!**
+
+### Database Connection
+
+From outside Docker (for Python scripts/API):
+```
+Host: 127.0.0.1
+Port: 5432
+User: logflow
+Password: logflow123
+Database: logflow
+```
+
+From inside Docker (for other containers):
+```
+Host: postgres
+Port: 5432
+User: logflow
+Password: logflow123
+Database: logflow
+```
+
+### Manual Database Access
+```bash
+# Via Docker
+docker compose exec postgres psql -U logflow -d logflow
+
+# Common queries
+\dt                          # List tables
+\d users                     # Describe users table
+SELECT * FROM users;         # View all users
+SELECT * FROM system_config; # View configuration
+```
+
+### Backup and Restore
+
+**Create Backup:**
+```bash
+./scripts/manage-db.sh backup
+# Creates: backups/logflow-YYYYMMDD-HHMMSS.sql
+```
+
+**Restore from Backup:**
+```bash
+cat backups/logflow-20251024-120000.sql | docker compose exec -T postgres psql -U logflow -d logflow
+```
+
+### Troubleshooting
+
+**Can't connect from Python:**
+- Ensure `.env` has `POSTGRES_HOST=127.0.0.1` (not `localhost`)
+- Check PostgreSQL is running: `docker compose ps postgres`
+- Test connection: `docker compose exec postgres psql -U logflow -d logflow -c "SELECT 1;"`
+
+**Reset database:**
+```bash
+./scripts/manage-db.sh reset
+```
+
+**Check database size:**
+```bash
+docker compose exec postgres psql -U logflow -d logflow -c "\l+"
+```
+
