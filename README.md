@@ -178,3 +178,42 @@ python shipper/generate_logs.py --burst-interval 60
 - user-service
 - order-service
 - inventory-service
+
+## 📤 Log Shipper
+
+The shipper tails log files and sends them to Kafka in real-time.
+
+### Usage
+```bash
+# Start shipper (foreground)
+python shipper/shipper.py --log-file sample_logs/app.log
+
+# Start shipper (background)
+./scripts/start-shipper.sh
+
+# Stop shipper
+./scripts/stop-shipper.sh
+
+# Check status
+python shipper/shipper_status.py
+```
+
+### How It Works
+
+1. **Tails log file** - Like `tail -f`, watches for new lines
+2. **Wraps in metadata** - Adds hostname, timestamp, file path
+3. **Sends to Kafka** - Ships to `logs-raw` topic
+4. **Handles failures** - Automatic retries and reconnection
+
+### Message Format
+```json
+{
+  "raw_log": "2025-10-23 15:30:45 INFO [service] message",
+  "metadata": {
+    "source": "hostname",
+    "file_path": "sample_logs/app.log",
+    "shipper_timestamp": 1729698645.123,
+    "service": "app"
+  }
+}
+```
