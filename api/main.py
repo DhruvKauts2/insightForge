@@ -15,6 +15,7 @@ sys.path.insert(0, str(project_root))
 from api.config import API_TITLE, API_VERSION, API_DESCRIPTION, API_HOST, API_PORT
 from api.models.log import HealthResponse
 from api.utils.elasticsearch_client import es_client
+from api.routes import search
 
 # Configure logging
 logger.remove()
@@ -38,6 +39,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(search.router)
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -60,7 +64,12 @@ async def root():
         "version": API_VERSION,
         "status": "running",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "endpoints": {
+            "search": "/api/v1/logs/search",
+            "recent": "/api/v1/logs/recent",
+            "get_by_id": "/api/v1/logs/{id}"
+        }
     }
 
 
@@ -84,10 +93,6 @@ async def health_check():
         timestamp=datetime.now().isoformat(),
         services=services
     )
-
-
-# This will be extended in Step 8 with search routes
-# and Step 9 with metrics routes
 
 
 if __name__ == "__main__":

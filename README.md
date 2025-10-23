@@ -364,3 +364,101 @@ Current configuration handles:
 - 📋 Kubernetes deployment
 - 📋 CI/CD pipeline
 
+
+## 🔍 REST API
+
+Query and search logs via REST API.
+
+### Quick Start
+```bash
+# Start API
+python -m api.main
+
+# Or in background
+./scripts/start-api.sh
+```
+
+### API Endpoints
+
+**Base URL:** `http://localhost:8000`
+
+#### Search Logs
+```bash
+POST /api/v1/logs/search
+```
+
+**Request body:**
+```json
+{
+  "query": "database timeout",
+  "services": ["payment-service"],
+  "levels": ["ERROR", "WARN"],
+  "start_time": "2025-10-23 10:00:00",
+  "end_time": "2025-10-23 20:00:00",
+  "limit": 50,
+  "offset": 0
+}
+```
+
+**Response:**
+```json
+{
+  "total": 127,
+  "logs": [...],
+  "aggregations": {
+    "by_level": {"ERROR": 98, "WARN": 29},
+    "by_service": {"payment-service": 127}
+  },
+  "query_time_ms": 45.2
+}
+```
+
+#### Get Recent Logs
+```bash
+GET /api/v1/logs/recent?limit=50&level=ERROR
+```
+
+#### Get Log by ID
+```bash
+GET /api/v1/logs/{log_id}
+```
+
+#### Health Check
+```bash
+GET /health
+```
+
+### Interactive Documentation
+
+Visit http://localhost:8000/docs for Swagger UI with:
+- Interactive API testing
+- Request/response examples
+- Schema documentation
+
+### cURL Examples
+```bash
+# Search all logs
+curl -X POST "http://localhost:8000/api/v1/logs/search" \
+  -H "Content-Type: application/json" \
+  -d '{"limit": 10}'
+
+# Search ERROR logs
+curl -X POST "http://localhost:8000/api/v1/logs/search" \
+  -H "Content-Type: application/json" \
+  -d '{"levels": ["ERROR"], "limit": 5}'
+
+# Full-text search
+curl -X POST "http://localhost:8000/api/v1/logs/search" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "timeout", "limit": 5}'
+
+# Get recent logs
+curl "http://localhost:8000/api/v1/logs/recent?limit=10"
+```
+
+### Testing
+```bash
+# Run API tests
+./scripts/test-api.sh
+```
+
