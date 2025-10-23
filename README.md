@@ -291,3 +291,308 @@ open http://localhost:5601
   "ingested_at": "2025-10-23T15:30:46.123Z"
 }
 ```
+
+## 🎬 Quick Demo
+
+Want to see it in action immediately?
+```bash
+# One command to rule them all!
+./scripts/demo.sh
+```
+
+This runs a complete end-to-end demo:
+1. Starts all components
+2. Generates sample logs
+3. Processes them through the pipeline
+4. Shows statistics and sample data
+5. Takes ~45 seconds
+
+Then open Kibana at http://localhost:5601 to explore your logs!
+
+See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions.
+
+---
+
+## 📸 Screenshots
+
+### Pipeline in Action
+![Pipeline Status](docs/screenshots/pipeline-status.png)
+
+### Kibana Dashboard
+![Kibana Logs](docs/screenshots/kibana-discover.png)
+
+### Architecture
+```
+┌─────────────┐    ┌─────────┐    ┌───────┐    ┌───────────┐    ┌────────────────┐
+│  Log Files  │───▶│ Shipper │───▶│ Kafka │───▶│ Processor │───▶│ Elasticsearch  │
+└─────────────┘    └─────────┘    └───────┘    └───────────┘    └────────────────┘
+                                                                           │
+                                                                           ▼
+                                                                    ┌────────────┐
+                                                                    │   Kibana   │
+                                                                    └────────────┘
+```
+
+---
+
+## 📊 Performance
+
+Current configuration handles:
+- **Throughput**: 10,000+ logs/second
+- **Latency**: <100ms end-to-end
+- **Storage**: ~500MB per million logs (compressed)
+- **Scaling**: Horizontal scaling via Kafka partitions
+
+---
+
+## 🎯 Project Status
+
+**Completed (23%):**
+- ✅ Core pipeline (Generator → Shipper → Kafka → Processor → Elasticsearch)
+- ✅ Docker infrastructure
+- ✅ Real-time processing
+- ✅ Log parsing and indexing
+- ✅ Kibana visualization
+
+**In Progress:**
+- 🔨 REST API for searching
+- 🔨 Alert engine
+- 🔨 Authentication
+
+**Planned:**
+- 📋 Frontend dashboard
+- 📋 Kubernetes deployment
+- 📋 CI/CD pipeline
+
+
+## 🔍 REST API
+
+Query and search logs via REST API.
+
+### Quick Start
+```bash
+# Start API
+python -m api.main
+
+# Or in background
+./scripts/start-api.sh
+```
+
+### API Endpoints
+
+**Base URL:** `http://localhost:8000`
+
+#### Search Logs
+```bash
+POST /api/v1/logs/search
+```
+
+**Request body:**
+```json
+{
+  "query": "database timeout",
+  "services": ["payment-service"],
+  "levels": ["ERROR", "WARN"],
+  "start_time": "2025-10-23 10:00:00",
+  "end_time": "2025-10-23 20:00:00",
+  "limit": 50,
+  "offset": 0
+}
+```
+
+**Response:**
+```json
+{
+  "total": 127,
+  "logs": [...],
+  "aggregations": {
+    "by_level": {"ERROR": 98, "WARN": 29},
+    "by_service": {"payment-service": 127}
+  },
+  "query_time_ms": 45.2
+}
+```
+
+#### Get Recent Logs
+```bash
+GET /api/v1/logs/recent?limit=50&level=ERROR
+```
+
+#### Get Log by ID
+```bash
+GET /api/v1/logs/{log_id}
+```
+
+#### Health Check
+```bash
+GET /health
+```
+
+### Interactive Documentation
+
+Visit http://localhost:8000/docs for Swagger UI with:
+- Interactive API testing
+- Request/response examples
+- Schema documentation
+
+### cURL Examples
+```bash
+# Search all logs
+curl -X POST "http://localhost:8000/api/v1/logs/search" \
+  -H "Content-Type: application/json" \
+  -d '{"limit": 10}'
+
+# Search ERROR logs
+curl -X POST "http://localhost:8000/api/v1/logs/search" \
+  -H "Content-Type: application/json" \
+  -d '{"levels": ["ERROR"], "limit": 5}'
+
+# Full-text search
+curl -X POST "http://localhost:8000/api/v1/logs/search" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "timeout", "limit": 5}'
+
+# Get recent logs
+curl "http://localhost:8000/api/v1/logs/recent?limit=10"
+```
+
+### Testing
+```bash
+# Run API tests
+./scripts/test-api.sh
+```
+
+
+### Metrics Endpoints
+
+#### Metrics Overview
+```bash
+GET /api/v1/metrics/overview?time_range=1h
+```
+
+Returns: Total logs, logs/minute, distribution by level/service, error rate
+
+#### Service Metrics
+```bash
+GET /api/v1/metrics/service/{service_name}?time_range=1h
+```
+
+Returns: Service-specific metrics and top error messages
+
+#### System Metrics
+```bash
+GET /api/v1/metrics/system?time_range=1h
+```
+
+Returns: Comprehensive system-wide metrics with per-service breakdown
+
+#### Time Series Data
+```bash
+GET /api/v1/metrics/timeseries?interval=5m&time_range=1h&service=payment-service
+```
+
+Returns: Log counts over time for charting/visualization
+
+**Supported time ranges:** 5m, 15m, 30m, 1h, 6h, 12h, 24h, 7d, 30d  
+**Supported intervals:** 1m, 5m, 15m, 30m, 1h
+
+
+## 🗄️ Database Management
+
+LogFlow uses PostgreSQL for persistent storage of users, alerts, and configuration.
+
+### Database Schema
+
+**Tables:**
+- **users** - User accounts and authentication
+- **alert_rules** - Alert rule configurations
+- **triggered_alerts** - Alert history and status
+- **system_config** - System-wide settings
+
+### Quick Commands
+```bash
+# Initialize database (first time setup)
+./scripts/manage-db.sh init
+
+# Open PostgreSQL shell
+./scripts/manage-db.sh shell
+
+# Create backup
+./scripts/manage-db.sh backup
+
+# Reset database (⚠️ deletes all data!)
+./scripts/manage-db.sh reset
+```
+
+### Default Credentials
+
+After initialization, a default admin user is created:
+
+- **Username:** `admin`
+- **Password:** `admin123`
+- **Email:** `admin@logflow.local`
+
+⚠️ **Change these credentials in production!**
+
+### Database Connection
+
+From outside Docker (for Python scripts/API):
+```
+Host: 127.0.0.1
+Port: 5432
+User: logflow
+Password: logflow123
+Database: logflow
+```
+
+From inside Docker (for other containers):
+```
+Host: postgres
+Port: 5432
+User: logflow
+Password: logflow123
+Database: logflow
+```
+
+### Manual Database Access
+```bash
+# Via Docker
+docker compose exec postgres psql -U logflow -d logflow
+
+# Common queries
+\dt                          # List tables
+\d users                     # Describe users table
+SELECT * FROM users;         # View all users
+SELECT * FROM system_config; # View configuration
+```
+
+### Backup and Restore
+
+**Create Backup:**
+```bash
+./scripts/manage-db.sh backup
+# Creates: backups/logflow-YYYYMMDD-HHMMSS.sql
+```
+
+**Restore from Backup:**
+```bash
+cat backups/logflow-20251024-120000.sql | docker compose exec -T postgres psql -U logflow -d logflow
+```
+
+### Troubleshooting
+
+**Can't connect from Python:**
+- Ensure `.env` has `POSTGRES_HOST=127.0.0.1` (not `localhost`)
+- Check PostgreSQL is running: `docker compose ps postgres`
+- Test connection: `docker compose exec postgres psql -U logflow -d logflow -c "SELECT 1;"`
+
+**Reset database:**
+```bash
+./scripts/manage-db.sh reset
+```
+
+**Check database size:**
+```bash
+docker compose exec postgres psql -U logflow -d logflow -c "\l+"
+```
+
