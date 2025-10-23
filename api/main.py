@@ -15,7 +15,8 @@ sys.path.insert(0, str(project_root))
 from api.config import API_TITLE, API_VERSION, API_DESCRIPTION, API_HOST, API_PORT
 from api.models.log import HealthResponse
 from api.utils.elasticsearch_client import es_client
-from api.routes import search, metrics
+from api.utils.database import check_database_health
+from api.routes import search, metrics, alerts
 
 # Configure logging
 logger.remove()
@@ -42,6 +43,7 @@ app.add_middleware(
 # Include routers
 app.include_router(search.router)
 app.include_router(metrics.router)
+app.include_router(alerts.router)
 
 
 @app.on_event("startup")
@@ -69,11 +71,9 @@ async def root():
         "endpoints": {
             "search": "/api/v1/logs/search",
             "recent": "/api/v1/logs/recent",
-            "get_by_id": "/api/v1/logs/{id}",
-            "metrics_overview": "/api/v1/metrics/overview",
-            "service_metrics": "/api/v1/metrics/service/{name}",
-            "system_metrics": "/api/v1/metrics/system",
-            "timeseries": "/api/v1/metrics/timeseries"
+            "metrics": "/api/v1/metrics/overview",
+            "alert_rules": "/api/v1/alerts/rules",
+            "triggered_alerts": "/api/v1/alerts/triggered"
         }
     }
 
@@ -86,12 +86,17 @@ async def health_check():
     Returns the health status of the API and connected services.
     """
     es_health = es_client.health()
+    db_health = check_database_health()
     
     services = {
-        "elasticsearch": es_health.get("status", "unknown")
+        "elasticsearch": es_health.get("status", "unknown"),
+        "database": db_health.get("status", "unknown")
     }
     
-    overall_status = "healthy" if es_health.get("status") in ["green", "yellow"] else "unhealthy"
+    overall_status = "healthy" if all(
+        status in ["healthy", "green", "yellow"] 
+        for status in services.values()
+    ) else "unhealthy"
     
     return HealthResponse(
         status=overall_status,
