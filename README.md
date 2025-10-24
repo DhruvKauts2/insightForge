@@ -812,3 +812,115 @@ Built as a demonstration of:
 **🎉 LogFlow - Production-Ready Log Aggregation**
 
 If you found this project helpful, please star the repository!
+
+## 📊 Prometheus Metrics
+
+LogFlow exports metrics in Prometheus format for monitoring and observability.
+
+### Metrics Endpoints
+
+- **Application Metrics**: `http://localhost:8000/metrics`
+- **FastAPI Metrics**: `http://localhost:8000/metrics/fastapi`
+
+### Available Metrics
+
+#### HTTP Metrics
+```
+http_requests_total{method, endpoint, status}          # Total requests
+http_request_duration_seconds{method, endpoint}        # Request latency
+```
+
+#### Business Metrics
+```
+logs_processed_total                                   # Logs processed
+logs_indexed_total{service, level}                     # Logs indexed
+elasticsearch_queries_total{operation}                 # ES queries
+elasticsearch_query_duration_seconds{operation}        # ES query time
+```
+
+#### Alert Metrics
+```
+alerts_triggered_total{rule_name}                      # Alerts triggered
+alerts_checked_total                                   # Alert checks
+```
+
+#### Cache Metrics
+```
+cache_hits_total{cache_key_prefix}                     # Cache hits
+cache_misses_total{cache_key_prefix}                   # Cache misses
+```
+
+#### Database Metrics
+```
+database_queries_total{operation}                      # DB queries
+database_connections                                   # Active connections
+```
+
+#### Authentication Metrics
+```
+auth_attempts_total{result}                            # Auth attempts
+users_registered_total                                 # Users registered
+```
+
+#### Rate Limit Metrics
+```
+rate_limit_exceeded_total{endpoint}                    # Rate limits hit
+```
+
+### Scraping with Prometheus
+
+Add to your `prometheus.yml`:
+```yaml
+scrape_configs:
+  - job_name: 'logflow'
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+```
+
+### Example Queries
+```promql
+# Request rate per endpoint
+rate(http_requests_total[5m])
+
+# 95th percentile response time
+histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+
+# Error rate
+rate(http_requests_total{status=~"5.."}[5m])
+
+# Cache hit rate
+rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))
+
+# Alert trigger rate
+rate(alerts_triggered_total[1h])
+```
+
+### Grafana Dashboard
+
+Import the included Grafana dashboard for visualization:
+
+1. Open Grafana
+2. Import dashboard
+3. Use `grafana-dashboard.json` from the project
+4. Select Prometheus data source
+
+### Testing Metrics
+```bash
+# Run metrics test
+./scripts/test-metrics.sh
+
+# View metrics in browser
+open http://localhost:8000/metrics
+
+# Generate traffic for testing
+for i in {1..100}; do
+  curl -s http://localhost:8000/ > /dev/null
+  curl -s http://localhost:8000/api/v1/metrics/overview > /dev/null
+done
+
+# View updated metrics
+curl http://localhost:8000/metrics | grep http_requests_total
+```
+

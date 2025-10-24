@@ -1,83 +1,120 @@
 """
-Elasticsearch client utilities
+Elasticsearch client with Prometheus metrics
 """
 from elasticsearch import Elasticsearch
-from api.config import ES_HOSTS
 from loguru import logger
 import time
+from typing import Optional, Tuple, Dict, Any
+
+from config import settings
+from api.utils.prometheus_metrics import (
+    elasticsearch_queries_total,
+    elasticsearch_query_duration_seconds
+)
 
 
-class ESClient:
-    """Singleton Elasticsearch client"""
-    _instance = None
-    _es = None
+class ElasticsearchClient:
+    """Elasticsearch client wrapper with metrics"""
     
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(ESClient, cls).__new__(cls)
-            cls._instance._initialize()
-        return cls._instance
+    def __init__(self):
+        self._client = None
+        self._connected = False
+        self._initialize()
     
     def _initialize(self):
         """Initialize Elasticsearch connection"""
         try:
-            # Get first host if it's a list
-            es_host = ES_HOSTS[0] if isinstance(ES_HOSTS, list) else ES_HOSTS
+            hosts = settings.elasticsearch_hosts.split(',')
+            self._client = Elasticsearch(hosts=hosts)
             
-            self._es = Elasticsearch(
-                es_host,
-                request_timeout=30
-            )
+            # Test connection
+            info = self._client.info()
+            self._connected = True
+            logger.info(f"✅ Connected to Elasticsearch {info['version']['number']}")
             
-            if self._es.ping():
-                info = self._es.info()
-                logger.info(f"Connected to Elasticsearch {info['version']['number']}")
-            else:
-                logger.error("Elasticsearch ping failed")
-                
         except Exception as e:
-            logger.error(f"Failed to connect to Elasticsearch: {e}")
-            raise
+            logger.error(f"Elasticsearch connection failed: {e}")
+            self._connected = False
     
-    @property
-    def client(self):
-        """Get Elasticsearch client"""
-        return self._es
+    def is_connected(self) -> bool:
+        """Check if Elasticsearch is connected"""
+        return self._connected
     
-    def search(self, index, body):
-        """Execute search query"""
+    def search(self, index: str, body: dict) -> Tuple[Dict[Any, Any], float]:
+        """
+        Search Elasticsearch with metrics
+        
+        Returns:
+            Tuple of (response, query_time_ms)
+        """
         start_time = time.time()
+        
         try:
-            response = self._es.search(index=index, body=body)
+            response = self._client.search(index=index, body=body)
             query_time = (time.time() - start_time) * 1000  # Convert to ms
+            
+            # Record metrics
+            elasticsearch_queries_total.labels(operation='search').inc()
+            elasticsearch_query_duration_seconds.labels(operation='search').observe(time.time() - start_time)
+            
             return response, query_time
+            
         except Exception as e:
             logger.error(f"Search error: {e}")
+            elasticsearch_queries_total.labels(operation='search_error').inc()
             raise
     
-    def count(self, index, body=None):
-        """Count documents"""
+    def index(self, index: str, document: dict, doc_id: Optional[str] = None):
+        """Index a document with metrics"""
+        start_time = time.time()
+        
         try:
-            response = self._es.count(index=index, body=body)
-            return response['count']
+            if doc_id:
+                response = self._client.index(index=index, id=doc_id, document=document)
+            else:
+                response = self._client.index(index=index, document=document)
+            
+            # Record metrics
+            elasticsearch_queries_total.labels(operation='index').inc()
+            elasticsearch_query_duration_seconds.labels(operation='index').observe(time.time() - start_time)
+            
+            return response
+            
         except Exception as e:
-            logger.error(f"Count error: {e}")
+            logger.error(f"Index error: {e}")
+            elasticsearch_queries_total.labels(operation='index_error').inc()
             raise
     
-    def health(self):
-        """Check Elasticsearch health"""
+    def get_by_id(self, index: str, doc_id: str) -> Optional[dict]:
+        """Get document by ID with metrics"""
+        start_time = time.time()
+        
         try:
-            if self._es.ping():
-                cluster_health = self._es.cluster.health()
-                return {
-                    "status": cluster_health['status'],
-                    "nodes": cluster_health['number_of_nodes']
-                }
-            return {"status": "down"}
+            response = self._client.get(index=index, id=doc_id)
+            
+            # Record metrics
+            elasticsearch_queries_total.labels(operation='get').inc()
+            elasticsearch_query_duration_seconds.labels(operation='get').observe(time.time() - start_time)
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Get by ID error: {e}")
+            elasticsearch_queries_total.labels(operation='get_error').inc()
+            return None
+    
+    def health(self) -> dict:
+        """Get Elasticsearch health"""
+        if not self._connected:
+            return {"status": "disconnected"}
+        
+        try:
+            health = self._client.cluster.health()
+            return health
         except Exception as e:
             logger.error(f"Health check error: {e}")
             return {"status": "error", "error": str(e)}
 
 
-# Singleton instance
-es_client = ESClient()
+# Global Elasticsearch client instance
+es_client = ElasticsearchClient()
