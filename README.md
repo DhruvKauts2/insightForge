@@ -1,598 +1,546 @@
 # LogFlow - Distributed Log Aggregation System
 
-A real-time log aggregation, processing, and analysis platform built with modern backend technologies.
+A production-grade distributed log aggregation and analysis platform built with Python, Kafka, Elasticsearch, and PostgreSQL.
 
-## 🎯 Features
+## 🎯 Overview
 
-- **Real-time Log Ingestion**: Collect logs from multiple sources
-- **Stream Processing**: Process logs with Kafka for scalability
-- **Full-Text Search**: Search logs instantly with Elasticsearch
-- **Smart Alerting**: Configure threshold-based alerts
-- **REST API**: Query and manage logs programmatically
-- **Monitoring**: Built-in metrics with Prometheus
+LogFlow is a real-time log aggregation system that collects, processes, stores, and analyzes logs from multiple services. It features a RESTful API, alerting engine, and full containerized deployment.
+
+## ✨ Features
+
+### Core Capabilities
+- **Real-time Log Processing** - Stream logs through Kafka for scalable ingestion
+- **Multi-service Support** - Aggregate logs from multiple microservices
+- **Advanced Search** - Full-text search with filters (service, level, time range)
+- **Metrics & Analytics** - Real-time aggregations and statistics
+- **Alerting System** - Rule-based alerts with multiple notification channels
+- **RESTful API** - Complete API for log queries and management
+- **Containerized Deployment** - Fully Dockerized with Docker Compose
+
+### Technical Features
+- Stream processing with Apache Kafka
+- Full-text search with Elasticsearch
+- PostgreSQL for metadata and alert storage
+- Redis for caching (ready to use)
+- Health monitoring and status checks
+- Scalable microservices architecture
 
 ## 🏗️ Architecture
 ```
-[Log Sources] → [Shipper] → [Kafka] → [Processor] → [Elasticsearch]
-                                                            ↓
-                                                       [Query API]
-                                                            ↓
-                                                    [Alerting Engine]
+┌─────────────┐     ┌─────────┐     ┌───────────┐     ┌──────────────┐
+│ Log Sources │────▶│  Kafka  │────▶│ Processor │────▶│Elasticsearch │
+└─────────────┘     └─────────┘     └───────────┘     └──────────────┘
+                                                              │
+                                                              ▼
+                    ┌──────────┐                      ┌─────────────┐
+                    │PostgreSQL│◀─────────────────────│  REST API   │
+                    └──────────┘                      └─────────────┘
+                         │                                   ▲
+                         ▼                                   │
+                  ┌─────────────┐                           │
+                  │Alert Engine │───────────────────────────┘
+                  └─────────────┘
 ```
-
-## 🛠️ Tech Stack
-
-- **Languages**: Python 3.11+
-- **Message Queue**: Apache Kafka
-- **Search Engine**: Elasticsearch
-- **API Framework**: FastAPI
-- **Database**: PostgreSQL
-- **Cache**: Redis
-- **Containerization**: Docker, Docker Compose
-- **Orchestration**: Kubernetes (optional)
-
-## 📋 Prerequisites
-
-- Python 3.11+
-- Docker & Docker Compose
-- 8GB RAM minimum
-- 20GB disk space
 
 ## 🚀 Quick Start
 
-### 1. Clone and Setup
+### Prerequisites
+- Docker Desktop (with Docker Compose)
+- Git
+
+### Installation
 ```bash
-git clone <your-repo>
+# Clone the repository
+git clone <your-repo-url>
 cd logflow
-python3.11 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+
+# Start all services
+./scripts/start-all-docker.sh
 ```
 
-### 2. Start Infrastructure
+Wait ~30 seconds for all services to initialize. You should see:
+```
+✅ LogFlow is running!
+
+📊 Services:
+  - API:           http://localhost:8000
+  - API Docs:      http://localhost:8000/docs
+  - Elasticsearch: http://localhost:9200
+  - Kibana:        http://localhost:5601
+```
+
+### Verify Installation
 ```bash
-docker-compose up -d
+# Check system health
+curl http://localhost:8000/health
+
+# View recent logs
+curl http://localhost:8000/api/v1/logs/recent?limit=5
+
+# Get metrics
+curl http://localhost:8000/api/v1/metrics/overview
 ```
 
-### 3. Verify Services
-
-- Elasticsearch: http://localhost:9200
-- Kibana: http://localhost:5601
-- API Docs: http://localhost:8000/docs
-
-### 4. Run Components
-```bash
-# Terminal 1: Start API
-python api/main.py
-
-# Terminal 2: Start Processor
-python processor/processor.py
-
-# Terminal 3: Start Shipper
-python shipper/shipper.py
-```
-
-## 📁 Project Structure
-```
-logflow/
-├── shipper/          # Log collection agents
-├── processor/        # Stream processing
-├── api/              # REST API
-├── alerting/         # Alert engine
-├── tests/            # Test suite
-├── docs/             # Documentation
-└── docker-compose.yml
-```
-
-## 🧪 Testing
-```bash
-pytest tests/ -v
-```
-
-## 📊 Monitoring
-
-- Prometheus metrics: http://localhost:9090
-- Grafana dashboards: http://localhost:3000
-
-## 🔧 Configuration
-
-See `.env` file for all configuration options.
-
-## 📝 API Documentation
-
-Once running, visit: http://localhost:8000/docs
-
-## 🤝 Contributing
-
-This is a portfolio project built to demonstrate backend engineering skills.
-
-## 📄 License
-
-MIT License
-
-## 👤 Author
-
-Your Name - [GitHub](https://github.com/yourusername)
-
----
-
-**Status**: 🚧 In Development
-**Current Phase**: Infrastructure Setup
-
-## 📝 Log Generator
-
-Generate realistic application logs for testing:
-
-### Basic Usage
-```bash
-# Generate text logs (default)
-python shipper/generate_logs.py
-
-# Generate JSON logs
-python shipper/generate_logs.py --format json
-
-# Custom rate (10 logs/second)
-python shipper/generate_logs.py --rate 10
-
-# Custom burst interval (every 60 seconds)
-python shipper/generate_logs.py --burst-interval 60
-```
-
-### Background Generation
-```bash
-# Start generator in background
-./scripts/generate-logs.sh
-
-# Stop background generator
-./scripts/stop-logs.sh
-```
-
-### Log Format
-
-**Text format:**
-```
-2025-10-23 14:32:15 INFO [payment-service] Payment completed for order order_45231
-```
-
-**JSON format:**
-```json
-{
-  "timestamp": "2025-10-23 14:35:22",
-  "level": "ERROR",
-  "service": "payment-service",
-  "message": "Payment gateway unavailable"
-}
-```
-
-### Log Levels Distribution
-
-- INFO: 70%
-- WARN: 15%
-- ERROR: 10%
-- DEBUG: 5%
-
-### Services
-
-- payment-service
-- auth-service
-- user-service
-- order-service
-- inventory-service
-
-## 📤 Log Shipper
-
-The shipper tails log files and sends them to Kafka in real-time.
-
-### Usage
-```bash
-# Start shipper (foreground)
-python shipper/shipper.py --log-file sample_logs/app.log
-
-# Start shipper (background)
-./scripts/start-shipper.sh
-
-# Stop shipper
-./scripts/stop-shipper.sh
-
-# Check status
-python shipper/shipper_status.py
-```
-
-### How It Works
-
-1. **Tails log file** - Like `tail -f`, watches for new lines
-2. **Wraps in metadata** - Adds hostname, timestamp, file path
-3. **Sends to Kafka** - Ships to `logs-raw` topic
-4. **Handles failures** - Automatic retries and reconnection
-
-### Message Format
-```json
-{
-  "raw_log": "2025-10-23 15:30:45 INFO [service] message",
-  "metadata": {
-    "source": "hostname",
-    "file_path": "sample_logs/app.log",
-    "shipper_timestamp": 1729698645.123,
-    "service": "app"
-  }
-}
-```
-
-## ⚙️ Log Processor
-
-The processor consumes from Kafka, parses logs, and indexes to Elasticsearch.
-
-### Usage
-```bash
-# Start processor (foreground)
-python processor/processor.py
-
-# Start processor (background)
-./scripts/start-processor.sh
-
-# Stop processor
-./scripts/stop-processor.sh
-```
-
-### Complete Pipeline
-```bash
-# Start entire pipeline
-./scripts/start-pipeline.sh
-
-# Check status
-./scripts/pipeline-status.sh
-
-# Stop entire pipeline
-./scripts/stop-pipeline.sh
-```
-
-### Pipeline Flow
-```
-Logs → Shipper → Kafka → Processor → Elasticsearch → Kibana
-```
-
-### Viewing Logs
-
-**Elasticsearch API:**
-```bash
-# Count logs
-curl http://localhost:9200/logs-*/_count
-
-# Search logs
-curl -X GET "http://localhost:9200/logs-*/_search?pretty" -H 'Content-Type: application/json' -d'
-{
-  "query": { "match": { "level": "ERROR" } },
-  "size": 10
-}
-'
-```
-
-**Kibana UI:**
-```bash
-open http://localhost:5601
-# Go to Discover → Create index pattern: logs-*
-```
-
-### Document Structure
-```json
-{
-  "_id": "uuid",
-  "timestamp": "2025-10-23 15:30:45",
-  "level": "ERROR",
-  "service": "payment-service",
-  "message": "Database connection timeout",
-  "source": {
-    "hostname": "laptop",
-    "file": "sample_logs/app.log"
-  },
-  "extra_fields": {
-    "error_code": "E503"
-  },
-  "ingested_at": "2025-10-23T15:30:46.123Z"
-}
-```
-
-## 🎬 Quick Demo
-
-Want to see it in action immediately?
-```bash
-# One command to rule them all!
-./scripts/demo.sh
-```
-
-This runs a complete end-to-end demo:
-1. Starts all components
-2. Generates sample logs
-3. Processes them through the pipeline
-4. Shows statistics and sample data
-5. Takes ~45 seconds
-
-Then open Kibana at http://localhost:5601 to explore your logs!
-
-See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions.
-
----
-
-## 📸 Screenshots
-
-### Pipeline in Action
-![Pipeline Status](docs/screenshots/pipeline-status.png)
-
-### Kibana Dashboard
-![Kibana Logs](docs/screenshots/kibana-discover.png)
-
-### Architecture
-```
-┌─────────────┐    ┌─────────┐    ┌───────┐    ┌───────────┐    ┌────────────────┐
-│  Log Files  │───▶│ Shipper │───▶│ Kafka │───▶│ Processor │───▶│ Elasticsearch  │
-└─────────────┘    └─────────┘    └───────┘    └───────────┘    └────────────────┘
-                                                                           │
-                                                                           ▼
-                                                                    ┌────────────┐
-                                                                    │   Kibana   │
-                                                                    └────────────┘
-```
-
----
-
-## 📊 Performance
-
-Current configuration handles:
-- **Throughput**: 10,000+ logs/second
-- **Latency**: <100ms end-to-end
-- **Storage**: ~500MB per million logs (compressed)
-- **Scaling**: Horizontal scaling via Kafka partitions
-
----
-
-## 🎯 Project Status
-
-**Completed (23%):**
-- ✅ Core pipeline (Generator → Shipper → Kafka → Processor → Elasticsearch)
-- ✅ Docker infrastructure
-- ✅ Real-time processing
-- ✅ Log parsing and indexing
-- ✅ Kibana visualization
-
-**In Progress:**
-- 🔨 REST API for searching
-- 🔨 Alert engine
-- 🔨 Authentication
-
-**Planned:**
-- 📋 Frontend dashboard
-- 📋 Kubernetes deployment
-- 📋 CI/CD pipeline
-
-
-## 🔍 REST API
-
-Query and search logs via REST API.
-
-### Quick Start
-```bash
-# Start API
-python -m api.main
-
-# Or in background
-./scripts/start-api.sh
-```
+## 📖 Usage
 
 ### API Endpoints
 
-**Base URL:** `http://localhost:8000`
+**Interactive Documentation:** http://localhost:8000/docs
 
 #### Search Logs
 ```bash
-POST /api/v1/logs/search
-```
-
-**Request body:**
-```json
-{
-  "query": "database timeout",
-  "services": ["payment-service"],
-  "levels": ["ERROR", "WARN"],
-  "start_time": "2025-10-23 10:00:00",
-  "end_time": "2025-10-23 20:00:00",
-  "limit": 50,
-  "offset": 0
-}
-```
-
-**Response:**
-```json
-{
-  "total": 127,
-  "logs": [...],
-  "aggregations": {
-    "by_level": {"ERROR": 98, "WARN": 29},
-    "by_service": {"payment-service": 127}
-  },
-  "query_time_ms": 45.2
-}
-```
-
-#### Get Recent Logs
-```bash
-GET /api/v1/logs/recent?limit=50&level=ERROR
-```
-
-#### Get Log by ID
-```bash
-GET /api/v1/logs/{log_id}
-```
-
-#### Health Check
-```bash
-GET /health
-```
-
-### Interactive Documentation
-
-Visit http://localhost:8000/docs for Swagger UI with:
-- Interactive API testing
-- Request/response examples
-- Schema documentation
-
-### cURL Examples
-```bash
 # Search all logs
-curl -X POST "http://localhost:8000/api/v1/logs/search" \
-  -H "Content-Type: application/json" \
-  -d '{"limit": 10}'
+GET /api/v1/logs/search?query=error
 
-# Search ERROR logs
-curl -X POST "http://localhost:8000/api/v1/logs/search" \
-  -H "Content-Type: application/json" \
-  -d '{"levels": ["ERROR"], "limit": 5}'
+# Filter by service
+GET /api/v1/logs/search?service=payment-service
 
-# Full-text search
-curl -X POST "http://localhost:8000/api/v1/logs/search" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "timeout", "limit": 5}'
+# Filter by log level
+GET /api/v1/logs/search?level=ERROR
 
-# Get recent logs
-curl "http://localhost:8000/api/v1/logs/recent?limit=10"
+# Recent logs
+GET /api/v1/logs/recent?limit=100
 ```
 
-### Testing
+#### Metrics
 ```bash
-# Run API tests
-./scripts/test-api.sh
+# Overall metrics
+GET /api/v1/metrics/overview
+
+# Service-specific metrics
+GET /api/v1/metrics/service/{service_name}
+
+# System metrics
+GET /api/v1/metrics/system
+
+# Time series data
+GET /api/v1/metrics/timeseries?interval=5m
 ```
 
-
-### Metrics Endpoints
-
-#### Metrics Overview
+#### Alert Management
 ```bash
-GET /api/v1/metrics/overview?time_range=1h
+# Create alert rule
+POST /api/v1/alerts/rules
+{
+  "name": "High Error Rate",
+  "condition": "greater_than",
+  "threshold": 100,
+  "levels": ["ERROR"],
+  "notification_channel": "webhook"
+}
+
+# List alert rules
+GET /api/v1/alerts/rules
+
+# Update rule
+PUT /api/v1/alerts/rules/{rule_id}
+
+# Delete rule
+DELETE /api/v1/alerts/rules/{rule_id}
+
+# View triggered alerts
+GET /api/v1/alerts/triggered
+
+# Acknowledge alert
+POST /api/v1/alerts/triggered/{alert_id}/acknowledge
+
+# Resolve alert
+POST /api/v1/alerts/triggered/{alert_id}/resolve
 ```
 
-Returns: Total logs, logs/minute, distribution by level/service, error rate
+## 🔔 Alerting System
 
-#### Service Metrics
-```bash
-GET /api/v1/metrics/service/{service_name}?time_range=1h
+### Alert Rules
+
+Alert rules monitor logs and trigger notifications when conditions are met.
+
+**Supported Conditions:**
+- `greater_than` - Value > threshold
+- `less_than` - Value < threshold  
+- `equals` - Value == threshold
+- `greater_than_or_equal` - Value >= threshold
+- `less_than_or_equal` - Value <= threshold
+
+**Notification Channels:**
+- `console` - Print to logs (testing)
+- `webhook` - POST to HTTP endpoint
+- `email` - Email notifications (extensible)
+- `slack` - Slack webhooks (extensible)
+
+### Example Alert Rule
+```json
+{
+  "name": "Critical Error Spike",
+  "description": "Alert when ERROR logs exceed 50 in 5 minutes",
+  "condition": "greater_than",
+  "threshold": 50,
+  "time_window": 5,
+  "levels": ["ERROR"],
+  "services": ["payment-service", "auth-service"],
+  "notification_channel": "webhook",
+  "notification_config": {
+    "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  },
+  "is_active": true
+}
 ```
-
-Returns: Service-specific metrics and top error messages
-
-#### System Metrics
-```bash
-GET /api/v1/metrics/system?time_range=1h
-```
-
-Returns: Comprehensive system-wide metrics with per-service breakdown
-
-#### Time Series Data
-```bash
-GET /api/v1/metrics/timeseries?interval=5m&time_range=1h&service=payment-service
-```
-
-Returns: Log counts over time for charting/visualization
-
-**Supported time ranges:** 5m, 15m, 30m, 1h, 6h, 12h, 24h, 7d, 30d  
-**Supported intervals:** 1m, 5m, 15m, 30m, 1h
-
 
 ## 🗄️ Database Management
 
-LogFlow uses PostgreSQL for persistent storage of users, alerts, and configuration.
-
-### Database Schema
-
-**Tables:**
-- **users** - User accounts and authentication
-- **alert_rules** - Alert rule configurations
-- **triggered_alerts** - Alert history and status
-- **system_config** - System-wide settings
-
-### Quick Commands
+### Access Database
 ```bash
-# Initialize database (first time setup)
-./scripts/manage-db.sh init
-
 # Open PostgreSQL shell
 ./scripts/manage-db.sh shell
 
 # Create backup
 ./scripts/manage-db.sh backup
 
-# Reset database (⚠️ deletes all data!)
-./scripts/manage-db.sh reset
+# Initialize/reset database
+./scripts/manage-db.sh init
 ```
 
 ### Default Credentials
 
-After initialization, a default admin user is created:
+**Admin User:**
+- Username: `admin`
+- Password: `admin123`
+- Email: `admin@logflow.local`
 
-- **Username:** `admin`
-- **Password:** `admin123`
-- **Email:** `admin@logflow.local`
+⚠️ **Change credentials in production!**
 
-⚠️ **Change these credentials in production!**
+## 🐳 Docker Services
 
-### Database Connection
+### Service List
 
-From outside Docker (for Python scripts/API):
-```
-Host: 127.0.0.1
-Port: 5432
-User: logflow
-Password: logflow123
-Database: logflow
-```
+| Service | Port | Description |
+|---------|------|-------------|
+| API | 8000 | REST API server |
+| Elasticsearch | 9200 | Log storage and search |
+| Kibana | 5601 | Elasticsearch UI |
+| Kafka | 9092 | Message queue |
+| PostgreSQL | 5432 | Metadata storage |
+| Redis | 6379 | Caching layer |
+| Alerting Engine | - | Background alert processor |
 
-From inside Docker (for other containers):
-```
-Host: postgres
-Port: 5432
-User: logflow
-Password: logflow123
-Database: logflow
-```
-
-### Manual Database Access
+### Managing Services
 ```bash
-# Via Docker
-docker compose exec postgres psql -U logflow -d logflow
+# Start all services
+docker compose up -d
 
-# Common queries
-\dt                          # List tables
-\d users                     # Describe users table
-SELECT * FROM users;         # View all users
-SELECT * FROM system_config; # View configuration
+# Stop all services
+docker compose down
+
+# View logs
+docker compose logs -f api
+docker compose logs -f alerting
+
+# Restart a service
+docker compose restart api
+
+# Check status
+docker compose ps
 ```
 
-### Backup and Restore
+## 📊 Monitoring
 
-**Create Backup:**
+### Health Check
 ```bash
-./scripts/manage-db.sh backup
-# Creates: backups/logflow-YYYYMMDD-HHMMSS.sql
+curl http://localhost:8000/health
 ```
 
-**Restore from Backup:**
-```bash
-cat backups/logflow-20251024-120000.sql | docker compose exec -T postgres psql -U logflow -d logflow
+Response:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-10-23T21:35:00.000000",
+  "services": {
+    "elasticsearch": "green",
+    "database": "healthy"
+  }
+}
 ```
 
-### Troubleshooting
-
-**Can't connect from Python:**
-- Ensure `.env` has `POSTGRES_HOST=127.0.0.1` (not `localhost`)
-- Check PostgreSQL is running: `docker compose ps postgres`
-- Test connection: `docker compose exec postgres psql -U logflow -d logflow -c "SELECT 1;"`
-
-**Reset database:**
+### Service Logs
 ```bash
-./scripts/manage-db.sh reset
+# API logs
+docker compose logs -f api
+
+# Alerting engine logs
+docker compose logs -f alerting
+
+# All logs
+docker compose logs -f
 ```
 
-**Check database size:**
+## 🛠️ Development
+
+### Project Structure
+```
+logflow/
+├── api/                    # REST API
+│   ├── routes/            # API endpoints
+│   ├── models/            # Pydantic & SQLAlchemy models
+│   └── utils/             # Database, ES clients
+├── alerting/              # Alert engine
+│   ├── engine.py          # Main alert loop
+│   ├── alert_evaluator.py # Rule evaluation
+│   └── notifier.py        # Notifications
+├── producer/              # Log shipper (Kafka producer)
+├── consumer/              # Log processor (Kafka consumer)
+├── log_generator/         # Synthetic log generation
+├── scripts/               # Utility scripts
+├── docker-compose.yml     # Service orchestration
+└── Dockerfile.*           # Container definitions
+```
+
+### Local Development
+
+If you want to run services locally (outside Docker):
 ```bash
-docker compose exec postgres psql -U logflow -d logflow -c "\l+"
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables (use localhost instead of service names)
+export POSTGRES_HOST=127.0.0.1
+export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+export ELASTICSEARCH_HOSTS=http://localhost:9200
+
+# Note: Database connections from outside Docker may require 
+# additional PostgreSQL configuration. Running in Docker is recommended.
+```
+
+## 🧪 Testing
+```bash
+# Run log pipeline
+./scripts/start-pipeline.sh
+
+# Generate sample logs
+python log_generator/generator.py --duration 60
+
+# Check pipeline status
+./scripts/pipeline-status.sh
+
+# Stop pipeline
+./scripts/stop-pipeline.sh
+```
+
+## 🎓 Technology Stack
+
+- **Python 3.11+** - Core language
+- **FastAPI** - REST API framework
+- **Apache Kafka** - Message streaming
+- **Elasticsearch 8.x** - Search and analytics
+- **PostgreSQL 16** - Relational database
+- **Redis 7** - Caching layer
+- **Docker & Docker Compose** - Containerization
+- **SQLAlchemy 2.0** - ORM
+- **Pydantic v2** - Data validation
+
+## 📝 API Documentation
+
+Interactive API documentation is available at:
+- **Swagger UI:** http://localhost:8000/docs
+- **ReDoc:** http://localhost:8000/redoc
+
+## 🔐 Security Notes
+
+**For Production:**
+- Change default admin password
+- Use environment variables for secrets
+- Enable Elasticsearch security
+- Add API authentication (JWT)
+- Use HTTPS/TLS
+- Implement rate limiting
+- Regular security updates
+
+## 🤝 Contributing
+
+This is a portfolio/learning project. Feel free to fork and extend!
+
+## 📄 License
+
+MIT License - See LICENSE file for details
+
+## 🎯 Roadmap
+
+- [x] Core log aggregation pipeline
+- [x] REST API with search and metrics
+- [x] Alert rules and notifications
+- [x] Containerized deployment
+- [ ] JWT authentication
+- [ ] Redis caching implementation
+- [ ] WebSocket real-time streaming
+- [ ] Web dashboard (React)
+- [ ] Kubernetes deployment
+- [ ] Anomaly detection with ML
+
+## 📧 Contact
+
+Built by [Your Name]
+- GitHub: [@yourusername]
+- Email: your.email@example.com
+
+---
+
+**⭐ If you found this project helpful, please star the repository!**
+
+## 🔐 Authentication & Security
+
+LogFlow uses JWT (JSON Web Token) authentication to secure API endpoints.
+
+### User Registration
+
+Register a new user account:
+```bash
+POST /api/v1/auth/register
+
+{
+  "username": "johndoe",
+  "email": "john@example.com",
+  "password": "securepassword123",
+  "full_name": "John Doe"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 2,
+  "username": "johndoe",
+  "email": "john@example.com",
+  "full_name": "John Doe",
+  "is_active": true,
+  "is_admin": false
+}
+```
+
+### Login
+
+Get an access token:
+```bash
+POST /api/v1/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=johndoe&password=securepassword123
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+### Using Authentication
+
+Include the token in the Authorization header:
+```bash
+curl -X GET "http://localhost:8000/api/v1/auth/me" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+### Protected Endpoints
+
+The following endpoints require authentication:
+
+**User Management:**
+- `POST /api/v1/auth/register` - Register new user (public)
+- `POST /api/v1/auth/login` - Login (public)
+- `GET /api/v1/auth/me` - Get current user (authenticated)
+- `PUT /api/v1/auth/me` - Update profile (authenticated)
+
+**Alert Rules:**
+- `POST /api/v1/alerts/rules` - Create rule (authenticated)
+- `PUT /api/v1/alerts/rules/{id}` - Update rule (owner or admin)
+- `DELETE /api/v1/alerts/rules/{id}` - Delete rule (owner or admin)
+- `POST /api/v1/alerts/triggered/{id}/acknowledge` - Acknowledge (authenticated)
+- `POST /api/v1/alerts/triggered/{id}/resolve` - Resolve (authenticated)
+
+**Public Endpoints:**
+- `GET /api/v1/logs/*` - Search logs
+- `GET /api/v1/metrics/*` - View metrics
+- `GET /api/v1/alerts/rules` - List rules
+- `GET /api/v1/alerts/triggered` - List triggered alerts
+
+### Default Admin Account
+
+**Username:** `admin`  
+**Password:** `admin123`
+
+⚠️ **Change this password immediately in production!**
+```bash
+# Login as admin
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=admin123"
+```
+
+### Token Configuration
+
+Tokens expire after 30 minutes by default. Configure in `.env`:
+```bash
+SECRET_KEY=your-secret-key-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+### Security Best Practices
+
+**For Production:**
+1. Change default admin password
+2. Use strong SECRET_KEY (generate with `openssl rand -hex 32`)
+3. Enable HTTPS/TLS
+4. Set short token expiration times
+5. Implement token refresh mechanism
+6. Add rate limiting
+7. Use environment variables for secrets
+8. Enable CORS restrictions
+9. Regular security audits
+10. Keep dependencies updated
+
+### Password Requirements
+
+- Minimum 8 characters
+- Maximum 72 characters (bcrypt limitation)
+- No specific complexity requirements (customize as needed)
+
+### Example: Complete Authentication Flow
+```bash
+# 1. Register
+curl -X POST "http://localhost:8000/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "alice",
+    "email": "alice@example.com",
+    "password": "alicepass123",
+    "full_name": "Alice Smith"
+  }'
+
+# 2. Login
+TOKEN=$(curl -s -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=alice&password=alicepass123" \
+  | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+
+# 3. Use authenticated endpoints
+curl -X POST "http://localhost:8000/api/v1/alerts/rules" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Alert",
+    "condition": "greater_than",
+    "threshold": 50,
+    "levels": ["ERROR"],
+    "notification_channel": "console"
+  }'
+
+# 4. Get user profile
+curl -X GET "http://localhost:8000/api/v1/auth/me" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 

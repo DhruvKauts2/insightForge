@@ -1,12 +1,13 @@
 """
-LogFlow REST API
+LogFlow REST API with Authentication
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from loguru import logger
 import sys
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -15,11 +16,24 @@ sys.path.insert(0, str(project_root))
 from api.config import API_TITLE, API_VERSION, API_DESCRIPTION, API_HOST, API_PORT
 from api.models.log import HealthResponse
 from api.utils.elasticsearch_client import es_client
-from api.routes import search, metrics
+from api.utils.database import check_database_health
+from api.routes import search, metrics, alerts, auth
 
 # Configure logging
 logger.remove()
 logger.add(sys.stderr, level="INFO")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan events"""
+    # Startup
+    logger.info(f"Starting {API_TITLE} v{API_VERSION}")
+    logger.info(f"API docs available at http://{API_HOST}:{API_PORT}/docs")
+    yield
+    # Shutdown
+    logger.info("Shutting down API")
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -27,7 +41,8 @@ app = FastAPI(
     version=API_VERSION,
     description=API_DESCRIPTION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -40,21 +55,10 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router)
 app.include_router(search.router)
 app.include_router(metrics.router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Run on startup"""
-    logger.info(f"Starting {API_TITLE} v{API_VERSION}")
-    logger.info(f"API docs available at http://{API_HOST}:{API_PORT}/docs")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Run on shutdown"""
-    logger.info("Shutting down API")
+app.include_router(alerts.router)
 
 
 @app.get("/", tags=["Root"])
@@ -66,32 +70,36 @@ async def root():
         "status": "running",
         "docs": "/docs",
         "health": "/health",
+        "authentication": {
+            "register": "/api/v1/auth/register",
+            "login": "/api/v1/auth/login",
+            "me": "/api/v1/auth/me"
+        },
         "endpoints": {
             "search": "/api/v1/logs/search",
             "recent": "/api/v1/logs/recent",
-            "get_by_id": "/api/v1/logs/{id}",
-            "metrics_overview": "/api/v1/metrics/overview",
-            "service_metrics": "/api/v1/metrics/service/{name}",
-            "system_metrics": "/api/v1/metrics/system",
-            "timeseries": "/api/v1/metrics/timeseries"
+            "metrics": "/api/v1/metrics/overview",
+            "alert_rules": "/api/v1/alerts/rules",
+            "triggered_alerts": "/api/v1/alerts/triggered"
         }
     }
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
-    """
-    Health check endpoint
-    
-    Returns the health status of the API and connected services.
-    """
+    """Health check endpoint"""
     es_health = es_client.health()
+    db_health = check_database_health()
     
     services = {
-        "elasticsearch": es_health.get("status", "unknown")
+        "elasticsearch": es_health.get("status", "unknown"),
+        "database": db_health.get("status", "unknown")
     }
     
-    overall_status = "healthy" if es_health.get("status") in ["green", "yellow"] else "unhealthy"
+    overall_status = "healthy" if all(
+        status in ["healthy", "green", "yellow"] 
+        for status in services.values()
+    ) else "unhealthy"
     
     return HealthResponse(
         status=overall_status,
