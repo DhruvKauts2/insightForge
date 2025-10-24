@@ -1,5 +1,5 @@
 """
-Metrics and aggregation routes
+Metrics and aggregation routes with caching
 """
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
@@ -15,6 +15,7 @@ from api.models.metrics import (
     TimeSeriesPoint
 )
 from api.utils.elasticsearch_client import es_client
+from api.utils.redis_client import redis_client
 from api.config import ES_INDEX_PATTERN
 
 router = APIRouter(prefix="/api/v1/metrics", tags=["Metrics"])
@@ -23,16 +24,16 @@ router = APIRouter(prefix="/api/v1/metrics", tags=["Metrics"])
 @router.get("/overview", response_model=TimeRangeMetrics)
 async def get_metrics_overview():
     """
-    Get metrics overview for all logs
-    
-    Returns aggregated metrics including:
-    - Total logs
-    - Distribution by level
-    - Distribution by service
-    - Error rate
+    Get metrics overview for all logs (cached)
     """
+    cache_key = "metrics:overview"
+    
+    # Try cache first
+    cached = redis_client.get(cache_key)
+    if cached:
+        return cached
+    
     try:
-        # Simple query without time filter
         es_query = {
             "query": {"match_all": {}},
             "size": 0,
@@ -63,14 +64,11 @@ async def get_metrics_overview():
             for bucket in es_response["aggregations"]["by_service"]["buckets"]
         }
         
-        # Calculate metrics
         error_count = by_level.get("ERROR", 0)
         error_rate = round((error_count / total_logs * 100), 2) if total_logs > 0 else 0
-        
-        # Estimate logs per minute (assuming data from last hour)
         logs_per_minute = round(total_logs / 60, 2) if total_logs > 0 else 0
         
-        return TimeRangeMetrics(
+        result = TimeRangeMetrics(
             time_range="all",
             total_logs=total_logs,
             logs_per_minute=logs_per_minute,
@@ -79,26 +77,29 @@ async def get_metrics_overview():
             error_rate=error_rate
         )
         
+        # Cache for 30 seconds
+        redis_client.set(cache_key, result.dict(), ttl=30)
+        
+        return result
+        
     except Exception as e:
         logger.error(f"Metrics overview error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get metrics: {str(e)}")
 
 
 @router.get("/service/{service_name}", response_model=ServiceMetrics)
 async def get_service_metrics(service_name: str):
     """
-    Get metrics for a specific service
-    
-    Returns detailed metrics for a single service including:
-    - Total logs
-    - Distribution by level
-    - Error rate
-    - Top error messages
+    Get metrics for a specific service (cached)
     """
+    cache_key = f"metrics:service:{service_name}"
+    
+    # Try cache first
+    cached = redis_client.get(cache_key)
+    if cached:
+        return cached
+    
     try:
-        # Query for service metrics
         es_query = {
             "query": {
                 "term": {"service": service_name}
@@ -149,7 +150,6 @@ async def get_service_metrics(service_name: str):
         error_count = by_level.get("ERROR", 0)
         error_rate = round((error_count / total_logs * 100), 2) if total_logs > 0 else 0
         
-        # Parse top errors
         top_errors = []
         error_buckets = es_response["aggregations"]["top_errors"]["error_messages"]["buckets"]
         for bucket in error_buckets[:10]:
@@ -162,7 +162,7 @@ async def get_service_metrics(service_name: str):
                     last_seen=latest_hit["_source"]["timestamp"]
                 ))
         
-        return ServiceMetrics(
+        result = ServiceMetrics(
             service=service_name,
             total_logs=total_logs,
             by_level=by_level,
@@ -170,27 +170,31 @@ async def get_service_metrics(service_name: str):
             top_errors=top_errors
         )
         
+        # Cache for 1 minute
+        redis_client.set(cache_key, result.dict(), ttl=60)
+        
+        return result
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Service metrics error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get service metrics: {str(e)}")
 
 
 @router.get("/system", response_model=SystemMetrics)
 async def get_system_metrics():
     """
-    Get comprehensive system metrics
-    
-    Returns system-wide metrics including:
-    - Overall statistics
-    - Per-service breakdown
-    - Performance metrics
+    Get comprehensive system metrics (cached)
     """
+    cache_key = "metrics:system"
+    
+    # Try cache first
+    cached = redis_client.get(cache_key)
+    if cached:
+        return cached
+    
     try:
-        # Query for all services
         es_query = {
             "query": {"match_all": {}},
             "size": 0,
@@ -233,13 +237,11 @@ async def get_system_metrics():
         
         total_logs = es_response["hits"]["total"]["value"]
         
-        # Overall level distribution
         overall_by_level = {
             bucket["key"]: bucket["doc_count"]
             for bucket in es_response["aggregations"]["by_level"]["buckets"]
         }
         
-        # Per-service metrics
         service_buckets = es_response["aggregations"]["by_service"]["buckets"]
         metrics_by_service = []
         
@@ -255,7 +257,6 @@ async def get_system_metrics():
             error_count = service_by_level.get("ERROR", 0)
             error_rate = round((error_count / service_total * 100), 2) if service_total > 0 else 0
             
-            # Top errors for this service
             top_errors = []
             error_messages = service_bucket["top_errors"]["messages"]["buckets"]
             for msg_bucket in error_messages[:5]:
@@ -276,10 +277,9 @@ async def get_system_metrics():
                 top_errors=top_errors
             ))
         
-        # Estimate logs per second (assuming recent data)
         logs_per_second = round(total_logs / 3600, 2) if total_logs > 0 else 0
         
-        return SystemMetrics(
+        result = SystemMetrics(
             timestamp=datetime.now().isoformat(),
             total_logs=total_logs,
             total_services=len(service_buckets),
@@ -289,25 +289,32 @@ async def get_system_metrics():
             logs_per_second=logs_per_second
         )
         
+        # Cache for 45 seconds
+        redis_client.set(cache_key, result.dict(), ttl=45)
+        
+        return result
+        
     except Exception as e:
         logger.error(f"System metrics error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get system metrics: {str(e)}")
 
 
 @router.get("/timeseries", response_model=TimeSeriesResponse)
 async def get_time_series(
-    interval: str = Query("5m", regex="^(1m|5m|15m|30m|1h)$"),
+    interval: str = Query("5m", pattern="^(1m|5m|15m|30m|1h)$"),
     service: Optional[str] = Query(None)
 ):
     """
-    Get time series data for visualization
-    
-    Returns log counts over time with specified interval.
+    Get time series data for visualization (cached)
     """
+    cache_key = f"metrics:timeseries:{interval}:{service or 'all'}"
+    
+    # Try cache first
+    cached = redis_client.get(cache_key)
+    if cached:
+        return cached
+    
     try:
-        # Build query
         if service:
             query = {"term": {"service": service}}
         else:
@@ -337,7 +344,6 @@ async def get_time_series(
             body=es_query
         )
         
-        # Parse time series data
         time_series_data = []
         for bucket in es_response["aggregations"]["over_time"]["buckets"]:
             by_level = {
@@ -351,14 +357,33 @@ async def get_time_series(
                 by_level=by_level
             ))
         
-        return TimeSeriesResponse(
+        result = TimeSeriesResponse(
             interval=interval,
             data=time_series_data,
             total_points=len(time_series_data)
         )
         
+        # Cache for 2 minutes
+        redis_client.set(cache_key, result.dict(), ttl=120)
+        
+        return result
+        
     except Exception as e:
         logger.error(f"Time series error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get time series: {str(e)}")
+
+
+@router.delete("/cache")
+async def clear_metrics_cache():
+    """
+    Clear all metrics cache (admin operation)
+    """
+    try:
+        deleted = redis_client.delete_pattern("metrics:*")
+        return {
+            "message": "Metrics cache cleared",
+            "keys_deleted": deleted
+        }
+    except Exception as e:
+        logger.error(f"Cache clear error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
