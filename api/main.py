@@ -1,8 +1,10 @@
 """
-LogFlow REST API with Caching
+LogFlow REST API with Rate Limiting
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from datetime import datetime
 from loguru import logger
 import sys
@@ -17,6 +19,7 @@ from api.models.log import HealthResponse
 from api.utils.elasticsearch_client import es_client
 from api.utils.database import check_database_health
 from api.utils.redis_client import redis_client
+from api.utils.rate_limiter import limiter, setup_redis_storage
 from api.routes import search, metrics, alerts, auth, cache
 
 logger.remove()
@@ -29,6 +32,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {API_TITLE} v{API_VERSION}")
     redis_client.connect()
+    setup_redis_storage()
     logger.info(f"API docs available at http://{API_HOST}:{API_PORT}/docs")
     yield
     # Shutdown
@@ -44,6 +48,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add rate limiter state
+app.state.limiter = limiter
+
+# Add rate limit exceeded handler
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,15 +72,22 @@ app.include_router(cache.router)
 
 
 @app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint"""
+@limiter.limit("60/minute")
+async def root(request: Request):
+    """Root endpoint with rate limiting"""
     return {
         "name": API_TITLE,
         "version": API_VERSION,
         "status": "running",
         "docs": "/docs",
         "health": "/health",
-        "cache": "/api/v1/cache/stats",
+        "rate_limits": {
+            "default": "100 requests/minute",
+            "authenticated": "Higher limits for authenticated users",
+            "search": "50 requests/minute",
+            "auth_login": "20 requests/hour",
+            "auth_register": "10 requests/hour"
+        },
         "endpoints": {
             "auth": "/api/v1/auth",
             "search": "/api/v1/logs/search",
@@ -81,8 +99,9 @@ async def root():
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
-async def health_check():
-    """Health check endpoint"""
+@limiter.exempt
+async def health_check(request: Request):
+    """Health check endpoint (exempt from rate limiting)"""
     es_health = es_client.health()
     db_health = check_database_health()
     redis_stats = redis_client.get_stats()
