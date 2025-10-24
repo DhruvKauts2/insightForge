@@ -1,5 +1,5 @@
 """
-Alert management routes
+Alert management routes - now with authentication
 """
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from api.models.alert import (
 )
 from api.models.database import AlertRule, TriggeredAlert, User
 from api.utils.database import get_db_session
+from api.utils.auth import get_current_user, get_current_admin
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["Alerts"])
 
@@ -24,20 +25,13 @@ router = APIRouter(prefix="/api/v1/alerts", tags=["Alerts"])
 @router.post("/rules", response_model=AlertRuleResponse, status_code=201)
 async def create_alert_rule(
     rule: AlertRuleCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db_session)
 ):
     """
-    Create a new alert rule
-    
-    Creates an alert rule that will be evaluated periodically by the alert engine.
+    Create a new alert rule (requires authentication)
     """
     try:
-        # Get admin user (in a real app, use authenticated user)
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            raise HTTPException(status_code=500, detail="Admin user not found")
-        
-        # Create alert rule
         db_rule = AlertRule(
             name=rule.name,
             description=rule.description,
@@ -50,14 +44,14 @@ async def create_alert_rule(
             notification_channel=rule.notification_channel,
             notification_config=rule.notification_config,
             is_active=rule.is_active,
-            owner_id=admin.id
+            owner_id=current_user.id
         )
         
         db.add(db_rule)
         db.commit()
         db.refresh(db_rule)
         
-        logger.info(f"Created alert rule: {db_rule.name} (ID: {db_rule.id})")
+        logger.info(f"User {current_user.username} created alert rule: {db_rule.name}")
         
         return db_rule
         
@@ -73,9 +67,7 @@ async def list_alert_rules(
     db: Session = Depends(get_db_session)
 ):
     """
-    List all alert rules
-    
-    Returns all alert rules, optionally filtered to active only.
+    List all alert rules (public endpoint)
     """
     try:
         query = db.query(AlertRule)
@@ -97,9 +89,7 @@ async def get_alert_rule(
     rule_id: int,
     db: Session = Depends(get_db_session)
 ):
-    """
-    Get a specific alert rule by ID
-    """
+    """Get a specific alert rule by ID"""
     rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
     
     if not rule:
@@ -112,18 +102,24 @@ async def get_alert_rule(
 async def update_alert_rule(
     rule_id: int,
     rule_update: AlertRuleUpdate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db_session)
 ):
     """
-    Update an alert rule
-    
-    Updates the specified alert rule with new values.
+    Update an alert rule (requires authentication, owner or admin only)
     """
     try:
         db_rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
         
         if not db_rule:
             raise HTTPException(status_code=404, detail="Alert rule not found")
+        
+        # Check permissions
+        if db_rule.owner_id != current_user.id and not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized to update this rule"
+            )
         
         # Update fields
         update_data = rule_update.dict(exclude_unset=True)
@@ -135,7 +131,7 @@ async def update_alert_rule(
         db.commit()
         db.refresh(db_rule)
         
-        logger.info(f"Updated alert rule: {db_rule.name} (ID: {db_rule.id})")
+        logger.info(f"User {current_user.username} updated alert rule: {db_rule.name}")
         
         return db_rule
         
@@ -150,12 +146,11 @@ async def update_alert_rule(
 @router.delete("/rules/{rule_id}", status_code=204)
 async def delete_alert_rule(
     rule_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db_session)
 ):
     """
-    Delete an alert rule
-    
-    Permanently deletes the specified alert rule.
+    Delete an alert rule (requires authentication, owner or admin only)
     """
     try:
         db_rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
@@ -163,10 +158,17 @@ async def delete_alert_rule(
         if not db_rule:
             raise HTTPException(status_code=404, detail="Alert rule not found")
         
+        # Check permissions
+        if db_rule.owner_id != current_user.id and not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized to delete this rule"
+            )
+        
         db.delete(db_rule)
         db.commit()
         
-        logger.info(f"Deleted alert rule: {db_rule.name} (ID: {rule_id})")
+        logger.info(f"User {current_user.username} deleted alert rule: {db_rule.name}")
         
         return None
         
@@ -185,11 +187,7 @@ async def list_triggered_alerts(
     limit: int = 100,
     db: Session = Depends(get_db_session)
 ):
-    """
-    List triggered alerts
-    
-    Returns triggered alerts, optionally filtered by status or rule.
-    """
+    """List triggered alerts (public endpoint)"""
     try:
         query = db.query(TriggeredAlert)
         
@@ -201,7 +199,6 @@ async def list_triggered_alerts(
         
         alerts = query.order_by(TriggeredAlert.triggered_at.desc()).limit(limit).all()
         
-        # Add rule name to response
         result = []
         for alert in alerts:
             alert_dict = {
@@ -232,34 +229,27 @@ async def list_triggered_alerts(
 async def acknowledge_alert(
     alert_id: int,
     ack: AlertAcknowledge,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db_session)
 ):
-    """
-    Acknowledge a triggered alert
-    
-    Marks the alert as acknowledged by a user.
-    """
+    """Acknowledge a triggered alert (requires authentication)"""
     try:
         alert = db.query(TriggeredAlert).filter(TriggeredAlert.id == alert_id).first()
         
         if not alert:
             raise HTTPException(status_code=404, detail="Triggered alert not found")
         
-        # Get admin user (in real app, use authenticated user)
-        admin = db.query(User).filter(User.username == "admin").first()
-        
         alert.status = "acknowledged"
         alert.acknowledged_at = datetime.utcnow()
-        alert.acknowledged_by = admin.id if admin else None
+        alert.acknowledged_by = current_user.id
         if ack.notes:
             alert.notes = ack.notes
         
         db.commit()
         db.refresh(alert)
         
-        logger.info(f"Acknowledged alert ID: {alert_id}")
+        logger.info(f"User {current_user.username} acknowledged alert ID: {alert_id}")
         
-        # Create response with rule name
         alert_dict = {
             "id": alert.id,
             "rule_id": alert.rule_id,
@@ -290,13 +280,10 @@ async def acknowledge_alert(
 async def resolve_alert(
     alert_id: int,
     resolve: AlertResolve,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db_session)
 ):
-    """
-    Resolve a triggered alert
-    
-    Marks the alert as resolved.
-    """
+    """Resolve a triggered alert (requires authentication)"""
     try:
         alert = db.query(TriggeredAlert).filter(TriggeredAlert.id == alert_id).first()
         
@@ -311,9 +298,8 @@ async def resolve_alert(
         db.commit()
         db.refresh(alert)
         
-        logger.info(f"Resolved alert ID: {alert_id}")
+        logger.info(f"User {current_user.username} resolved alert ID: {alert_id}")
         
-        # Create response with rule name
         alert_dict = {
             "id": alert.id,
             "rule_id": alert.rule_id,

@@ -387,3 +387,160 @@ Built by [Your Name]
 ---
 
 **⭐ If you found this project helpful, please star the repository!**
+
+## 🔐 Authentication & Security
+
+LogFlow uses JWT (JSON Web Token) authentication to secure API endpoints.
+
+### User Registration
+
+Register a new user account:
+```bash
+POST /api/v1/auth/register
+
+{
+  "username": "johndoe",
+  "email": "john@example.com",
+  "password": "securepassword123",
+  "full_name": "John Doe"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 2,
+  "username": "johndoe",
+  "email": "john@example.com",
+  "full_name": "John Doe",
+  "is_active": true,
+  "is_admin": false
+}
+```
+
+### Login
+
+Get an access token:
+```bash
+POST /api/v1/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=johndoe&password=securepassword123
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+### Using Authentication
+
+Include the token in the Authorization header:
+```bash
+curl -X GET "http://localhost:8000/api/v1/auth/me" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+### Protected Endpoints
+
+The following endpoints require authentication:
+
+**User Management:**
+- `POST /api/v1/auth/register` - Register new user (public)
+- `POST /api/v1/auth/login` - Login (public)
+- `GET /api/v1/auth/me` - Get current user (authenticated)
+- `PUT /api/v1/auth/me` - Update profile (authenticated)
+
+**Alert Rules:**
+- `POST /api/v1/alerts/rules` - Create rule (authenticated)
+- `PUT /api/v1/alerts/rules/{id}` - Update rule (owner or admin)
+- `DELETE /api/v1/alerts/rules/{id}` - Delete rule (owner or admin)
+- `POST /api/v1/alerts/triggered/{id}/acknowledge` - Acknowledge (authenticated)
+- `POST /api/v1/alerts/triggered/{id}/resolve` - Resolve (authenticated)
+
+**Public Endpoints:**
+- `GET /api/v1/logs/*` - Search logs
+- `GET /api/v1/metrics/*` - View metrics
+- `GET /api/v1/alerts/rules` - List rules
+- `GET /api/v1/alerts/triggered` - List triggered alerts
+
+### Default Admin Account
+
+**Username:** `admin`  
+**Password:** `admin123`
+
+⚠️ **Change this password immediately in production!**
+```bash
+# Login as admin
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=admin123"
+```
+
+### Token Configuration
+
+Tokens expire after 30 minutes by default. Configure in `.env`:
+```bash
+SECRET_KEY=your-secret-key-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+### Security Best Practices
+
+**For Production:**
+1. Change default admin password
+2. Use strong SECRET_KEY (generate with `openssl rand -hex 32`)
+3. Enable HTTPS/TLS
+4. Set short token expiration times
+5. Implement token refresh mechanism
+6. Add rate limiting
+7. Use environment variables for secrets
+8. Enable CORS restrictions
+9. Regular security audits
+10. Keep dependencies updated
+
+### Password Requirements
+
+- Minimum 8 characters
+- Maximum 72 characters (bcrypt limitation)
+- No specific complexity requirements (customize as needed)
+
+### Example: Complete Authentication Flow
+```bash
+# 1. Register
+curl -X POST "http://localhost:8000/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "alice",
+    "email": "alice@example.com",
+    "password": "alicepass123",
+    "full_name": "Alice Smith"
+  }'
+
+# 2. Login
+TOKEN=$(curl -s -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=alice&password=alicepass123" \
+  | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+
+# 3. Use authenticated endpoints
+curl -X POST "http://localhost:8000/api/v1/alerts/rules" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Alert",
+    "condition": "greater_than",
+    "threshold": 50,
+    "levels": ["ERROR"],
+    "notification_channel": "console"
+  }'
+
+# 4. Get user profile
+curl -X GET "http://localhost:8000/api/v1/auth/me" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
