@@ -1,5 +1,5 @@
 """
-LogFlow REST API with Authentication
+LogFlow REST API with Caching
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-# Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -17,9 +16,9 @@ from api.config import API_TITLE, API_VERSION, API_DESCRIPTION, API_HOST, API_PO
 from api.models.log import HealthResponse
 from api.utils.elasticsearch_client import es_client
 from api.utils.database import check_database_health
-from api.routes import search, metrics, alerts, auth
+from api.utils.redis_client import redis_client
+from api.routes import search, metrics, alerts, auth, cache
 
-# Configure logging
 logger.remove()
 logger.add(sys.stderr, level="INFO")
 
@@ -29,13 +28,13 @@ async def lifespan(app: FastAPI):
     """Lifespan events"""
     # Startup
     logger.info(f"Starting {API_TITLE} v{API_VERSION}")
+    redis_client.connect()
     logger.info(f"API docs available at http://{API_HOST}:{API_PORT}/docs")
     yield
     # Shutdown
     logger.info("Shutting down API")
 
 
-# Create FastAPI app
 app = FastAPI(
     title=API_TITLE,
     version=API_VERSION,
@@ -45,7 +44,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,6 +57,7 @@ app.include_router(auth.router)
 app.include_router(search.router)
 app.include_router(metrics.router)
 app.include_router(alerts.router)
+app.include_router(cache.router)
 
 
 @app.get("/", tags=["Root"])
@@ -70,17 +69,13 @@ async def root():
         "status": "running",
         "docs": "/docs",
         "health": "/health",
-        "authentication": {
-            "register": "/api/v1/auth/register",
-            "login": "/api/v1/auth/login",
-            "me": "/api/v1/auth/me"
-        },
+        "cache": "/api/v1/cache/stats",
         "endpoints": {
+            "auth": "/api/v1/auth",
             "search": "/api/v1/logs/search",
-            "recent": "/api/v1/logs/recent",
             "metrics": "/api/v1/metrics/overview",
-            "alert_rules": "/api/v1/alerts/rules",
-            "triggered_alerts": "/api/v1/alerts/triggered"
+            "alerts": "/api/v1/alerts/rules",
+            "cache": "/api/v1/cache"
         }
     }
 
@@ -90,10 +85,12 @@ async def health_check():
     """Health check endpoint"""
     es_health = es_client.health()
     db_health = check_database_health()
+    redis_stats = redis_client.get_stats()
     
     services = {
         "elasticsearch": es_health.get("status", "unknown"),
-        "database": db_health.get("status", "unknown")
+        "database": db_health.get("status", "unknown"),
+        "redis": "healthy" if redis_stats.get("connected") else "unhealthy"
     }
     
     overall_status = "healthy" if all(

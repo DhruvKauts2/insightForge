@@ -544,3 +544,119 @@ curl -X GET "http://localhost:8000/api/v1/auth/me" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+
+## ⚡ Caching with Redis
+
+LogFlow uses Redis to cache frequently accessed data, dramatically improving API performance.
+
+### Cached Endpoints
+
+The following endpoints are cached:
+
+| Endpoint | Cache TTL | Description |
+|----------|-----------|-------------|
+| `/api/v1/metrics/overview` | 30s | Overall metrics |
+| `/api/v1/metrics/service/{name}` | 60s | Service-specific metrics |
+| `/api/v1/metrics/system` | 45s | System-wide metrics |
+| `/api/v1/metrics/timeseries` | 120s | Time series data |
+
+### Cache Management
+
+**View cache statistics:**
+```bash
+GET /api/v1/cache/stats
+
+# Response
+{
+  "connected": true,
+  "used_memory": "1.23M",
+  "connected_clients": 2,
+  "keyspace_hits": 156,
+  "keyspace_misses": 12,
+  "keys": 8
+}
+```
+
+**Clear cache (admin only):**
+```bash
+# Clear all cache
+DELETE /api/v1/cache/clear
+
+# Clear specific pattern
+DELETE /api/v1/cache/clear?pattern=metrics:*
+
+# Clear service metrics only
+DELETE /api/v1/cache/clear?pattern=metrics:service:*
+```
+
+### Performance Impact
+
+Typical performance improvements with caching:
+
+- **First request (cache miss):** ~200-500ms (Elasticsearch query)
+- **Cached request (cache hit):** ~5-20ms (Redis lookup)
+- **Performance gain:** 10-100x faster! ⚡
+
+### Cache Keys
+
+Cache keys follow this pattern:
+```
+metrics:overview
+metrics:service:{service_name}
+metrics:system
+metrics:timeseries:{interval}:{service}
+```
+
+### Redis Configuration
+
+Configure Redis in `.env.docker`:
+```bash
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_DB=0
+```
+
+### Manual Cache Operations
+```bash
+# Check Redis directly
+docker compose exec redis redis-cli
+
+# View all keys
+KEYS *
+
+# View metrics keys
+KEYS "metrics:*"
+
+# Get specific key
+GET "metrics:overview"
+
+# Delete key
+DEL "metrics:overview"
+
+# Flush all cache
+FLUSHDB
+
+# Exit
+exit
+```
+
+### Cache Invalidation
+
+Cache is automatically invalidated by TTL (Time To Live):
+- Overview metrics: 30 seconds
+- Service metrics: 60 seconds
+- System metrics: 45 seconds
+- Time series: 120 seconds
+
+For manual invalidation, use the admin cache clear endpoint.
+
+### Graceful Degradation
+
+If Redis is unavailable:
+- API continues to work normally
+- Queries go directly to Elasticsearch
+- Performance returns to non-cached speed
+- No errors or failures
+
+The system automatically detects Redis availability and adapts.
+
