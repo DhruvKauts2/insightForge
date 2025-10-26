@@ -1,5 +1,5 @@
 """
-LogFlow REST API with WebSocket Support
+LogFlow REST API with Log Correlation
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +26,7 @@ from api.middleware.metrics import PrometheusMiddleware
 from api.middleware.request_id import RequestIDMiddleware
 from api.routes import (
     search, metrics, alerts, auth, cache, 
-    rate_limits, metrics_prometheus, tracing, websocket
+    rate_limits, metrics_prometheus, tracing, websocket, correlation
 )
 
 logger.remove()
@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"API docs available at http://{API_HOST}:{API_PORT}/docs")
     logger.info(f"Prometheus metrics at http://{API_HOST}:{API_PORT}/metrics")
     logger.info(f"WebSocket endpoints available at ws://{API_HOST}:{API_PORT}/ws/*")
+    logger.info(f"Log correlation enabled")
     yield
     # Shutdown
     logger.info("Shutting down API")
@@ -87,6 +88,7 @@ app.add_middleware(
 app.include_router(websocket.router)
 app.include_router(metrics_prometheus.router)
 app.include_router(tracing.router)
+app.include_router(correlation.router)
 app.include_router(auth.router)
 app.include_router(search.router)
 app.include_router(metrics.router)
@@ -104,13 +106,14 @@ async def root(request: Request):
         "version": API_VERSION,
         "status": "running",
         "request_id": request.state.request_id,
+        "correlation_id": request.state.correlation_id,
         "docs": "/docs",
         "health": "/health",
-        "websocket": {
-            "logs": "ws://localhost:8000/ws/logs",
-            "metrics": "ws://localhost:8000/ws/metrics",
-            "alerts": "ws://localhost:8000/ws/alerts",
-            "stats": "/ws/stats"
+        "features": {
+            "websocket": "ws://localhost:8000/ws/*",
+            "metrics": "/metrics",
+            "tracing": "/api/v1/trace",
+            "correlation": "/api/v1/correlation"
         },
         "endpoints": {
             "auth": "/api/v1/auth",
@@ -118,7 +121,8 @@ async def root(request: Request):
             "metrics": "/api/v1/metrics/overview",
             "alerts": "/api/v1/alerts/rules",
             "cache": "/api/v1/cache",
-            "trace": "/api/v1/trace"
+            "trace": "/api/v1/trace",
+            "correlation": "/api/v1/correlation"
         }
     }
 

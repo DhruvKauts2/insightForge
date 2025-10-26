@@ -13,6 +13,11 @@ class LogEntry(BaseModel):
     level: str
     service: str
     message: str
+    correlation_id: Optional[str] = None
+    request_id: Optional[str] = None
+    transaction_position: Optional[int] = None
+    transaction_total: Optional[int] = None
+    metadata: Optional[dict] = None
     
     class Config:
         from_attributes = True
