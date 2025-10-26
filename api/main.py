@@ -1,5 +1,5 @@
 """
-LogFlow REST API with Prometheus Metrics
+LogFlow REST API with Request Tracing
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +23,11 @@ from api.utils.database import check_database_health
 from api.utils.redis_client import redis_client
 from api.utils.rate_limiter import limiter
 from api.middleware.metrics import PrometheusMiddleware
-from api.routes import search, metrics, alerts, auth, cache, rate_limits, metrics_prometheus
+from api.middleware.request_id import RequestIDMiddleware
+from api.routes import (
+    search, metrics, alerts, auth, cache, 
+    rate_limits, metrics_prometheus, tracing
+)
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
@@ -37,6 +41,7 @@ async def lifespan(app: FastAPI):
     redis_client.connect()
     logger.info(f"API docs available at http://{API_HOST}:{API_PORT}/docs")
     logger.info(f"Prometheus metrics at http://{API_HOST}:{API_PORT}/metrics")
+    logger.info(f"Request tracing enabled")
     yield
     # Shutdown
     logger.info("Shutting down API")
@@ -51,7 +56,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add Prometheus instrumentator (automatic HTTP metrics)
+# Add Request ID middleware FIRST (so all other middleware can use it)
+app.add_middleware(RequestIDMiddleware)
+
+# Add Prometheus instrumentator
 Instrumentator().instrument(app).expose(app, endpoint="/metrics/fastapi")
 
 # Add custom Prometheus middleware
@@ -76,7 +84,8 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(metrics_prometheus.router)  # Prometheus metrics
+app.include_router(metrics_prometheus.router)
+app.include_router(tracing.router)
 app.include_router(auth.router)
 app.include_router(search.router)
 app.include_router(metrics.router)
@@ -88,13 +97,16 @@ app.include_router(rate_limits.router)
 @app.get("/", tags=["Root"])
 @limiter.limit("60/minute")
 async def root(request: Request):
-    """Root endpoint"""
+    """Root endpoint with tracing"""
     return {
         "name": API_TITLE,
         "version": API_VERSION,
         "status": "running",
+        "request_id": request.state.request_id,
+        "correlation_id": request.state.correlation_id,
         "docs": "/docs",
         "health": "/health",
+        "trace": "/api/v1/trace/context",
         "metrics": {
             "prometheus": "/metrics",
             "fastapi": "/metrics/fastapi"
@@ -104,7 +116,8 @@ async def root(request: Request):
             "search": "/api/v1/logs/search",
             "metrics": "/api/v1/metrics/overview",
             "alerts": "/api/v1/alerts/rules",
-            "cache": "/api/v1/cache"
+            "cache": "/api/v1/cache",
+            "trace": "/api/v1/trace"
         }
     }
 
@@ -112,7 +125,7 @@ async def root(request: Request):
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 @limiter.exempt
 async def health_check(request: Request):
-    """Health check endpoint (exempt from rate limiting)"""
+    """Health check endpoint"""
     es_health = es_client.health()
     db_health = check_database_health()
     redis_stats = redis_client.get_stats()
