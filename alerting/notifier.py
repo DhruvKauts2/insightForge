@@ -1,95 +1,105 @@
 """
-Notification Handler - Sends alert notifications via various channels
+Alert notification handler with WebSocket support
 """
 from loguru import logger
+import requests
 from typing import Dict, Any
-import json
+import asyncio
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 
-class Notifier:
-    """Handles sending notifications for triggered alerts"""
+class AlertNotifier:
+    """Handle alert notifications to various channels"""
     
-    def send_notification(self, alert: Dict[str, Any], rule: Dict[str, Any]) -> bool:
+    def __init__(self):
+        self.websocket_manager = None
+    
+    def set_websocket_manager(self, manager):
+        """Set WebSocket manager for broadcasting"""
+        self.websocket_manager = manager
+    
+    async def notify(self, alert_data: Dict[str, Any], channel: str, config: Dict[str, Any]):
         """
-        Send notification for triggered alert
+        Send alert notification
         
         Args:
-            alert: Alert data
-            rule: Alert rule configuration
-            
-        Returns:
-            True if sent successfully, False otherwise
+            alert_data: Alert information
+            channel: Notification channel (console, webhook, email, websocket)
+            config: Channel-specific configuration
         """
-        channel = rule.get("notification_channel", "console")
-        config = rule.get("notification_config", {})
+        logger.info(f"Sending notification via {channel}")
         
         try:
             if channel == "console":
-                return self._send_console(alert, rule)
+                await self._notify_console(alert_data)
             elif channel == "webhook":
-                return self._send_webhook(alert, rule, config)
+                await self._notify_webhook(alert_data, config)
             elif channel == "email":
-                return self._send_email(alert, rule, config)
-            elif channel == "slack":
-                return self._send_slack(alert, rule, config)
+                await self._notify_email(alert_data, config)
+            elif channel == "websocket":
+                await self._notify_websocket(alert_data)
             else:
                 logger.warning(f"Unknown notification channel: {channel}")
-                return False
                 
         except Exception as e:
-            logger.error(f"Failed to send notification via {channel}: {e}")
-            return False
+            logger.error(f"Notification failed for channel {channel}: {e}")
     
-    def _send_console(self, alert: Dict[str, Any], rule: Dict[str, Any]) -> bool:
-        """Send notification to console (for testing)"""
-        logger.info("=" * 60)
-        logger.info("🚨 ALERT TRIGGERED")
-        logger.info(f"Rule: {alert['rule_name']}")
-        logger.info(f"Condition: {alert['value']} {alert['condition']} {alert['threshold']}")
-        logger.info(f"Log Count: {alert['log_count']}")
-        logger.info(f"Sample Logs:")
-        for i, log in enumerate(alert['sample_logs'][:3], 1):
-            logger.info(f"  {i}. [{log.get('level')}] {log.get('message', '')[:80]}")
-        logger.info("=" * 60)
-        return True
+    async def _notify_console(self, alert_data: Dict[str, Any]):
+        """Print alert to console"""
+        logger.warning(f"🚨 ALERT TRIGGERED: {alert_data['rule_name']}")
+        logger.warning(f"   Condition: {alert_data['condition']}")
+        logger.warning(f"   Current Value: {alert_data['current_value']}")
+        logger.warning(f"   Threshold: {alert_data['threshold']}")
+        logger.warning(f"   Time: {alert_data['triggered_at']}")
     
-    def _send_webhook(self, alert: Dict[str, Any], rule: Dict[str, Any], config: Dict[str, Any]) -> bool:
-        """Send notification via webhook"""
-        import requests
-        
+    async def _notify_webhook(self, alert_data: Dict[str, Any], config: Dict[str, Any]):
+        """Send alert via webhook"""
         url = config.get("url")
         if not url:
             logger.error("Webhook URL not configured")
-            return False
-        
-        payload = {
-            "alert_id": alert["rule_id"],
-            "rule_name": alert["rule_name"],
-            "triggered_at": datetime.now().isoformat(),
-            "condition": f"{alert['value']} {alert['condition']} {alert['threshold']}",
-            "log_count": alert["log_count"],
-            "sample_logs": alert["sample_logs"][:3]
-        }
-        
-        headers = config.get("headers", {})
+            return
         
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
-            response.raise_for_status()
+            # Run in thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    url,
+                    json=alert_data,
+                    timeout=5
+                )
+            )
             logger.info(f"Webhook notification sent to {url}")
-            return True
+            
         except Exception as e:
             logger.error(f"Webhook notification failed: {e}")
-            return False
     
-    def _send_email(self, alert: Dict[str, Any], rule: Dict[str, Any], config: Dict[str, Any]) -> bool:
-        """Send notification via email (placeholder)"""
-        logger.info(f"Email notification (not implemented): {alert['rule_name']}")
-        # TODO: Implement email sending (SMTP, SendGrid, etc.)
-        return True
+    async def _notify_email(self, alert_data: Dict[str, Any], config: Dict[str, Any]):
+        """Send alert via email (placeholder)"""
+        # TODO: Implement email notification
+        logger.info("Email notification (not implemented)")
+        logger.info(f"Would send to: {config.get('recipients', [])}")
     
-    def _send_slack(self, alert: Dict[str, Any], rule: Dict[str, Any], config: Dict[str, Any]) -> bool:
-        """Send notification via Slack (placeholder)"""
-        logger.info(f"Slack notification (not implemented): {alert['rule_name']}")
-        # TODO: Implement Slack webhook
-        return True
+    async def _notify_websocket(self, alert_data: Dict[str, Any]):
+        """Broadcast alert via WebSocket"""
+        if self.websocket_manager:
+            await self.websocket_manager.broadcast(
+                {
+                    "type": "alert",
+                    "data": alert_data
+                },
+                "alerts"
+            )
+            logger.info("Alert broadcast via WebSocket")
+        else:
+            logger.warning("WebSocket manager not available")
+
+
+# Global notifier instance
+notifier = AlertNotifier()
