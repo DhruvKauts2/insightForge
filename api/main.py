@@ -1,10 +1,12 @@
 """
-LogFlow REST API with Rate Limiting
+LogFlow REST API with WebSocket Support
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from datetime import datetime
 from loguru import logger
 import sys
@@ -19,8 +21,13 @@ from api.models.log import HealthResponse
 from api.utils.elasticsearch_client import es_client
 from api.utils.database import check_database_health
 from api.utils.redis_client import redis_client
-from api.utils.rate_limiter import limiter, setup_redis_storage
-from api.routes import search, metrics, alerts, auth, cache
+from api.utils.rate_limiter import limiter
+from api.middleware.metrics import PrometheusMiddleware
+from api.middleware.request_id import RequestIDMiddleware
+from api.routes import (
+    search, metrics, alerts, auth, cache, 
+    rate_limits, metrics_prometheus, tracing, websocket
+)
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
@@ -32,8 +39,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {API_TITLE} v{API_VERSION}")
     redis_client.connect()
-    setup_redis_storage()
     logger.info(f"API docs available at http://{API_HOST}:{API_PORT}/docs")
+    logger.info(f"Prometheus metrics at http://{API_HOST}:{API_PORT}/metrics")
+    logger.info(f"WebSocket endpoints available at ws://{API_HOST}:{API_PORT}/ws/*")
     yield
     # Shutdown
     logger.info("Shutting down API")
@@ -48,8 +56,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add Request ID middleware FIRST
+app.add_middleware(RequestIDMiddleware)
+
+# Add Prometheus instrumentator
+Instrumentator().instrument(app).expose(app, endpoint="/metrics/fastapi")
+
+# Add custom Prometheus middleware
+app.add_middleware(PrometheusMiddleware)
+
 # Add rate limiter state
 app.state.limiter = limiter
+
+# Add slowapi middleware for rate limiting
+app.add_middleware(SlowAPIMiddleware)
 
 # Add rate limit exceeded handler
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -64,36 +84,41 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(websocket.router)
+app.include_router(metrics_prometheus.router)
+app.include_router(tracing.router)
 app.include_router(auth.router)
 app.include_router(search.router)
 app.include_router(metrics.router)
 app.include_router(alerts.router)
 app.include_router(cache.router)
+app.include_router(rate_limits.router)
 
 
 @app.get("/", tags=["Root"])
 @limiter.limit("60/minute")
 async def root(request: Request):
-    """Root endpoint with rate limiting"""
+    """Root endpoint"""
     return {
         "name": API_TITLE,
         "version": API_VERSION,
         "status": "running",
+        "request_id": request.state.request_id,
         "docs": "/docs",
         "health": "/health",
-        "rate_limits": {
-            "default": "100 requests/minute",
-            "authenticated": "Higher limits for authenticated users",
-            "search": "50 requests/minute",
-            "auth_login": "20 requests/hour",
-            "auth_register": "10 requests/hour"
+        "websocket": {
+            "logs": "ws://localhost:8000/ws/logs",
+            "metrics": "ws://localhost:8000/ws/metrics",
+            "alerts": "ws://localhost:8000/ws/alerts",
+            "stats": "/ws/stats"
         },
         "endpoints": {
             "auth": "/api/v1/auth",
             "search": "/api/v1/logs/search",
             "metrics": "/api/v1/metrics/overview",
             "alerts": "/api/v1/alerts/rules",
-            "cache": "/api/v1/cache"
+            "cache": "/api/v1/cache",
+            "trace": "/api/v1/trace"
         }
     }
 
@@ -101,7 +126,7 @@ async def root(request: Request):
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 @limiter.exempt
 async def health_check(request: Request):
-    """Health check endpoint (exempt from rate limiting)"""
+    """Health check endpoint"""
     es_health = es_client.health()
     db_health = check_database_health()
     redis_stats = redis_client.get_stats()

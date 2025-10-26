@@ -812,3 +812,269 @@ Built as a demonstration of:
 **🎉 LogFlow - Production-Ready Log Aggregation**
 
 If you found this project helpful, please star the repository!
+
+## 📊 Prometheus Metrics
+
+LogFlow exports metrics in Prometheus format for monitoring and observability.
+
+### Metrics Endpoints
+
+- **Application Metrics**: `http://localhost:8000/metrics`
+- **FastAPI Metrics**: `http://localhost:8000/metrics/fastapi`
+
+### Available Metrics
+
+#### HTTP Metrics
+```
+http_requests_total{method, endpoint, status}          # Total requests
+http_request_duration_seconds{method, endpoint}        # Request latency
+```
+
+#### Business Metrics
+```
+logs_processed_total                                   # Logs processed
+logs_indexed_total{service, level}                     # Logs indexed
+elasticsearch_queries_total{operation}                 # ES queries
+elasticsearch_query_duration_seconds{operation}        # ES query time
+```
+
+#### Alert Metrics
+```
+alerts_triggered_total{rule_name}                      # Alerts triggered
+alerts_checked_total                                   # Alert checks
+```
+
+#### Cache Metrics
+```
+cache_hits_total{cache_key_prefix}                     # Cache hits
+cache_misses_total{cache_key_prefix}                   # Cache misses
+```
+
+#### Database Metrics
+```
+database_queries_total{operation}                      # DB queries
+database_connections                                   # Active connections
+```
+
+#### Authentication Metrics
+```
+auth_attempts_total{result}                            # Auth attempts
+users_registered_total                                 # Users registered
+```
+
+#### Rate Limit Metrics
+```
+rate_limit_exceeded_total{endpoint}                    # Rate limits hit
+```
+
+### Scraping with Prometheus
+
+Add to your `prometheus.yml`:
+```yaml
+scrape_configs:
+  - job_name: 'logflow'
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+```
+
+### Example Queries
+```promql
+# Request rate per endpoint
+rate(http_requests_total[5m])
+
+# 95th percentile response time
+histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+
+# Error rate
+rate(http_requests_total{status=~"5.."}[5m])
+
+# Cache hit rate
+rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))
+
+# Alert trigger rate
+rate(alerts_triggered_total[1h])
+```
+
+### Grafana Dashboard
+
+Import the included Grafana dashboard for visualization:
+
+1. Open Grafana
+2. Import dashboard
+3. Use `grafana-dashboard.json` from the project
+4. Select Prometheus data source
+
+### Testing Metrics
+```bash
+# Run metrics test
+./scripts/test-metrics.sh
+
+# View metrics in browser
+open http://localhost:8000/metrics
+
+# Generate traffic for testing
+for i in {1..100}; do
+  curl -s http://localhost:8000/ > /dev/null
+  curl -s http://localhost:8000/api/v1/metrics/overview > /dev/null
+done
+
+# View updated metrics
+curl http://localhost:8000/metrics | grep http_requests_total
+```
+
+
+## 🔍 Request Tracing & Correlation
+
+LogFlow implements distributed request tracing to track requests across the system.
+
+### Request IDs
+
+Every request gets a unique ID automatically:
+```bash
+curl -i http://localhost:8000/
+
+# Response headers include:
+X-Request-ID: 550e8400-e29b-41d4-a716-446655440000
+X-Correlation-ID: 550e8400-e29b-41d4-a716-446655440000
+```
+
+### Correlation IDs
+
+Track related requests across services:
+```bash
+# Send custom correlation ID
+curl -H "X-Correlation-ID: my-transaction-123" \
+  http://localhost:8000/api/v1/logs/search
+
+# The correlation ID is preserved in the response
+X-Correlation-ID: my-transaction-123
+```
+
+### Trace Context API
+
+**Get current trace context:**
+```bash
+GET /api/v1/trace/context
+
+Response:
+{
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-10-24T08:50:00.000000"
+}
+```
+
+**Get debug trace (admin only):**
+```bash
+GET /api/v1/trace/debug
+Authorization: Bearer <token>
+
+Response:
+{
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "correlation_id": "my-transaction-123",
+  "method": "GET",
+  "path": "/api/v1/trace/debug",
+  "headers": {...},
+  "query_params": {...},
+  "timestamp": "2025-10-24T08:50:00.000000",
+  "user": "admin"
+}
+```
+
+**Log custom trace event:**
+```bash
+POST /api/v1/trace/log
+{
+  "event": "payment_processed",
+  "details": {
+    "amount": 99.99,
+    "status": "success"
+  }
+}
+```
+
+### Using Trace Context in Code
+```python
+from api.middleware.request_id import get_request_id, get_correlation_id
+
+# Get current request ID
+request_id = get_request_id()
+
+# Get correlation ID
+correlation_id = get_correlation_id()
+
+# Log with context
+logger.bind(
+    request_id=request_id,
+    correlation_id=correlation_id
+).info("Processing payment")
+```
+
+### Trace Headers Flow
+```
+Client Request
+  ↓ (X-Correlation-ID: abc-123)
+API Gateway
+  ↓ (X-Request-ID: req-456)
+  ↓ (X-Correlation-ID: abc-123)
+Service A
+  ↓ (X-Request-ID: req-789)
+  ↓ (X-Correlation-ID: abc-123)
+Service B
+  ↓ Response includes both IDs
+Client
+```
+
+### Log Correlation Example
+```bash
+# Start a transaction
+CORRELATION_ID="txn-$(date +%s)"
+
+# Make multiple related requests
+curl -H "X-Correlation-ID: $CORRELATION_ID" \
+  http://localhost:8000/api/v1/auth/login
+
+curl -H "X-Correlation-ID: $CORRELATION_ID" \
+  http://localhost:8000/api/v1/logs/search
+
+curl -H "X-Correlation-ID: $CORRELATION_ID" \
+  http://localhost:8000/api/v1/alerts/rules
+
+# All logs will have the same correlation_id
+# Search logs: grep "$CORRELATION_ID" logs/*.log
+```
+
+### Testing Tracing
+```bash
+# Run tracing test
+./scripts/test-tracing.sh
+
+# Test with custom correlation ID
+CORR_ID="my-test-$(date +%s)"
+curl -H "X-Correlation-ID: $CORR_ID" \
+  http://localhost:8000/ | python3 -m json.tool
+
+# Verify correlation ID in response headers
+curl -i -H "X-Correlation-ID: $CORR_ID" \
+  http://localhost:8000/ | grep -i correlation
+```
+
+### Benefits
+
+- **Debugging**: Track requests across services
+- **Performance**: Identify slow request paths
+- **Monitoring**: Correlate logs and metrics
+- **Troubleshooting**: Follow user transactions
+- **Analytics**: Analyze user journeys
+
+### Best Practices
+
+1. **Always preserve correlation IDs** across service boundaries
+2. **Include IDs in all logs** for easy searching
+3. **Use correlation IDs for transactions** spanning multiple requests
+4. **Add trace context to error reports** for debugging
+5. **Monitor request chains** to identify bottlenecks
+
