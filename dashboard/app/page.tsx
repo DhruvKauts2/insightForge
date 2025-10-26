@@ -5,10 +5,13 @@ import { Activity, AlertTriangle, Database, TrendingUp } from 'lucide-react';
 import MetricsCard from '@/components/MetricsCard';
 import LogSearch from '@/components/LogSearch';
 import LogTable from '@/components/LogTable';
+import LogVolumeChart from '@/components/LogVolumeChart';
+import ServiceMetricsChart from '@/components/ServiceMetricsChart';
+import ErrorDistributionChart from '@/components/ErrorDistributionChart';
+import AnomalyPanel from '@/components/AnomalyPanel';
 import {
   searchLogs,
   getMetricsOverview,
-  getServiceMetrics,
 } from '@/lib/api';
 
 export default function Dashboard() {
@@ -18,6 +21,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadInitialData();
+    // Refresh metrics every 30 seconds
+    const interval = setInterval(loadMetrics, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadInitialData = async () => {
@@ -33,6 +39,15 @@ export default function Dashboard() {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMetrics = async () => {
+    try {
+      const metricsData = await getMetricsOverview();
+      setMetrics(metricsData);
+    } catch (error) {
+      console.error('Error loading metrics:', error);
     }
   };
 
@@ -61,8 +76,9 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                ● Live
+              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+                Live
               </span>
             </div>
           </div>
@@ -96,6 +112,17 @@ export default function Dashboard() {
             icon={<AlertTriangle className="w-8 h-8" />}
             trend={{ value: 2.1, isPositive: false }}
           />
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <LogVolumeChart />
+          <ServiceMetricsChart />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <ErrorDistributionChart />
+          <AnomalyPanel />
         </div>
 
         {/* Search Section */}

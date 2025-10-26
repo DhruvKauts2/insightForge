@@ -1,5 +1,5 @@
 """
-Anomaly detection service using statistical methods and ML
+Anomaly detection service - FIXED time queries
 """
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
@@ -21,8 +21,8 @@ class AnomalyDetector:
     
     def __init__(self):
         self.config = AnomalyDetectionConfig()
-        self.config.min_samples = 5  # Lower for sparse time-series data
-        self.config.sensitivity = 1.0  # Lower threshold for better detection
+        self.config.min_samples = 5
+        self.config.sensitivity = 1.0
         self.baselines: Dict[str, AnomalyBaseline] = {}
         logger.info(f"Anomaly detector initialized: min_samples={self.config.min_samples}, sensitivity={self.config.sensitivity}")
     
@@ -31,16 +31,7 @@ class AnomalyDetector:
         service: Optional[str] = None,
         window_minutes: int = 60
     ) -> List[DetectedAnomaly]:
-        """
-        Detect anomalies in log volume
-        
-        Args:
-            service: Optional service to check
-            window_minutes: Time window for detection
-            
-        Returns:
-            List of detected anomalies
-        """
+        """Detect anomalies in log volume"""
         try:
             time_series = await self._get_log_volume_timeseries(
                 service=service,
@@ -74,7 +65,7 @@ class AnomalyDetector:
             logger.info(f"Moving Average found {len(ma_anomalies)} anomalies")
             anomalies.extend(ma_anomalies)
             
-            # Isolation Forest (if enough data)
+            # Isolation Forest
             if len(time_series) >= 20:
                 if_anomalies = self._detect_isolation_forest_anomalies(
                     time_series,
@@ -148,8 +139,6 @@ class AnomalyDetector:
             anomaly_indices = np.where(z_scores > threshold)[0]
             
             logger.debug(f"Found {len(anomaly_indices)} points above threshold {threshold}")
-            logger.debug(f"Z-scores: {z_scores}")
-            logger.debug(f"Anomaly indices: {anomaly_indices}")
             
             for idx in anomaly_indices:
                 actual_value = values[idx]
@@ -182,7 +171,6 @@ class AnomalyDetector:
                     deviation_percent=float(deviation_percent)
                 )
                 anomalies.append(anomaly)
-                logger.debug(f"Detected anomaly: {anomaly_type} at {timestamps[idx]}, score={z_score:.2f}")
             
         except Exception as e:
             logger.error(f"Error in Z-Score detection: {e}")
@@ -307,7 +295,7 @@ class AnomalyDetector:
         return anomalies
     
     def _deduplicate_anomalies(self, anomalies: List[DetectedAnomaly]) -> List[DetectedAnomaly]:
-        """Remove duplicate anomalies and keep highest severity"""
+        """Remove duplicate anomalies"""
         if not anomalies:
             return []
         
@@ -333,17 +321,14 @@ class AnomalyDetector:
         service: Optional[str] = None,
         window_minutes: int = 60
     ) -> List[Tuple[str, float]]:
-        """Get log volume time series data"""
+        """Get log volume time series data - FIXED to use ES relative time"""
         try:
-            end_time = datetime.now()
-            start_time = end_time - timedelta(minutes=window_minutes)
-            
+            # Use Elasticsearch's native relative time syntax
             query: Dict[str, Any] = {
                 "query": {
                     "range": {
                         "timestamp": {
-                            "gte": start_time.isoformat(),
-                            "lte": end_time.isoformat()
+                            "gte": f"now-{window_minutes}m"
                         }
                     }
                 },
@@ -387,17 +372,13 @@ class AnomalyDetector:
         service: Optional[str] = None,
         window_minutes: int = 60
     ) -> List[Tuple[str, float]]:
-        """Get error rate time series data"""
+        """Get error rate time series data - FIXED to use ES relative time"""
         try:
-            end_time = datetime.now()
-            start_time = end_time - timedelta(minutes=window_minutes)
-            
             query: Dict[str, Any] = {
                 "query": {
                     "range": {
                         "timestamp": {
-                            "gte": start_time.isoformat(),
-                            "lte": end_time.isoformat()
+                            "gte": f"now-{window_minutes}m"
                         }
                     }
                 },
