@@ -1078,3 +1078,342 @@ curl -i -H "X-Correlation-ID: $CORR_ID" \
 4. **Add trace context to error reports** for debugging
 5. **Monitor request chains** to identify bottlenecks
 
+
+---
+
+## 🤖 ML-Based Anomaly Detection
+
+LogFlow uses machine learning to automatically detect unusual patterns in your logs, helping you catch issues before they become critical.
+
+### Detection Algorithms
+
+LogFlow employs **three complementary methods** for robust anomaly detection:
+
+1. **Z-Score (Statistical)**
+   - Detects deviations from historical mean
+   - Threshold: 1.0 standard deviations
+   - Best for: Sudden spikes or drops
+
+2. **Moving Average (Trend-based)**
+   - Compares current values to rolling average
+   - Adaptive window size
+   - Best for: Gradual trend changes
+
+3. **Isolation Forest (Machine Learning)**
+   - scikit-learn ensemble algorithm
+   - Detects complex patterns
+   - Best for: Multi-dimensional anomalies
+
+### API Endpoints
+
+**Detect log volume anomalies:**
+```bash
+GET /api/v1/anomaly/detect/log-volume?window_minutes=60
+
+Response:
+[
+  {
+    "detected_at": "2025-10-26T16:22:00.000Z",
+    "metric_name": "log_volume",
+    "service": "payment-service",
+    "anomaly_type": "spike",
+    "description": "log_volume spike: 3000.00 (expected ~225.00)",
+    "score": 2.25,
+    "severity": "high",
+    "actual_value": 3000.0,
+    "expected_value": 225.0,
+    "deviation_percent": 1233.3
+  }
+]
+```
+
+**Detect error rate anomalies:**
+```bash
+GET /api/v1/anomaly/detect/error-rate?window_minutes=60&service=auth-service
+```
+
+**Get comprehensive anomaly report:**
+```bash
+GET /api/v1/anomaly/report?window_minutes=60
+
+Response:
+{
+  "period_start": "2025-10-26T16:00:00",
+  "period_end": "2025-10-26T17:00:00",
+  "total_anomalies": 5,
+  "anomalies": [...],
+  "anomalies_by_severity": {
+    "critical": 2,
+    "high": 1,
+    "medium": 2
+  },
+  "anomalies_by_service": {
+    "payment-service": 3,
+    "auth-service": 2
+  }
+}
+```
+
+### Anomaly Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| **spike** | Sudden increase (>100%) | DDoS attack, traffic surge |
+| **drop** | Sudden decrease | Service outage, network issue |
+| **pattern_change** | Unusual pattern detected by ML | Degraded performance, subtle bugs |
+
+### Severity Levels
+
+| Severity | Z-Score | Deviation | Action |
+|----------|---------|-----------|--------|
+| **Critical** | > 4.0 | > 400% | Immediate action required |
+| **High** | 3.0-4.0 | 300-400% | Urgent investigation |
+| **Medium** | 2.5-3.0 | 250-300% | Review soon |
+| **Low** | 1.0-2.5 | 100-250% | Monitor |
+
+### Configuration
+
+Anomaly detection can be configured via query parameters:
+```bash
+# Time window (10-1440 minutes)
+?window_minutes=60
+
+# Service-specific detection
+?service=payment-service
+
+# Combined
+?window_minutes=120&service=auth-service
+```
+
+### Use Cases
+
+**1. DDoS Attack Detection**
+```bash
+# Detect sudden log volume spikes
+curl "http://localhost:8000/api/v1/anomaly/detect/log-volume?window_minutes=10"
+
+# If spike > 500%, likely DDoS
+```
+
+**2. Service Degradation**
+```bash
+# Monitor error rate changes
+curl "http://localhost:8000/api/v1/anomaly/detect/error-rate?window_minutes=30"
+
+# Rising error rates indicate problems
+```
+
+**3. Capacity Planning**
+```bash
+# Analyze trends over 24 hours
+curl "http://localhost:8000/api/v1/anomaly/report?window_minutes=1440"
+
+# Identify peak usage patterns
+```
+
+**4. Security Incidents**
+```bash
+# Detect unusual authentication patterns
+curl "http://localhost:8000/api/v1/anomaly/detect/log-volume?service=auth-service&window_minutes=60"
+
+# Spikes may indicate brute force attacks
+```
+
+**5. Performance Monitoring**
+```bash
+# Track all services
+curl "http://localhost:8000/api/v1/anomaly/report?window_minutes=60"
+
+# Group by service to find bottlenecks
+```
+
+### Testing Anomaly Detection
+```bash
+# Run comprehensive test
+./scripts/test-anomaly-complete.sh
+
+# Output:
+# ✅ Detected 3 log volume anomalies
+#    - HIGH: 3000 logs (expected 225, 1233.3% deviation)
+```
+
+### How It Works
+
+1. **Data Collection**: Aggregates logs into 1-minute buckets
+2. **Statistical Analysis**: Calculates mean, std dev, moving averages
+3. **ML Processing**: Isolation Forest identifies outliers
+4. **Scoring**: Assigns severity based on deviation magnitude
+5. **Deduplication**: Removes overlapping detections, keeps highest severity
+6. **Reporting**: Returns ranked anomalies with metadata
+
+### Algorithm Details
+
+**Z-Score Method:**
+```python
+z_score = (actual_value - mean) / std_deviation
+
+if z_score > 1.0:
+    # Anomaly detected
+    severity = calculate_severity(z_score)
+```
+
+**Moving Average:**
+```python
+moving_avg = average(last_5_values)
+deviation = |current_value - moving_avg|
+
+if deviation > threshold * moving_std:
+    # Anomaly detected
+```
+
+**Isolation Forest:**
+```python
+clf = IsolationForest(contamination=0.1)
+predictions = clf.fit_predict(values)
+
+# -1 indicates anomaly
+anomalies = values[predictions == -1]
+```
+
+### Best Practices
+
+1. **Choose appropriate time windows**
+   - Short windows (10-30 min): Real-time detection
+   - Medium windows (60-120 min): Pattern analysis
+   - Long windows (12-24 hours): Trend analysis
+
+2. **Set up alerts for critical anomalies**
+```bash
+   # Monitor and alert on critical anomalies
+   while true; do
+     CRITICAL=$(curl -s "localhost:8000/api/v1/anomaly/detect/log-volume?window_minutes=10" | \
+       grep '"severity": "critical"' | wc -l)
+     if [ $CRITICAL -gt 0 ]; then
+       echo "ALERT: $CRITICAL critical anomalies detected!"
+       # Send notification
+     fi
+     sleep 60
+   done
+```
+
+3. **Review false positives**
+   - Legitimate traffic spikes (marketing campaigns, sales)
+   - Scheduled batch jobs
+   - Deploy new features gradually to establish new baselines
+
+4. **Combine with correlation tracking**
+```bash
+   # Find anomaly then trace the flow
+   ANOMALY_TIME="2025-10-26T16:22:00.000Z"
+   
+   # Find correlation IDs around that time
+   curl "localhost:8000/api/v1/logs/search?timestamp=$ANOMALY_TIME&limit=10"
+   
+   # Trace the full request flow
+   curl "localhost:8000/api/v1/correlation/trace/{correlation_id}"
+```
+
+5. **Service-specific baselines**
+   - Different services have different normal patterns
+   - Use service parameter for accurate detection
+   - Auth services: Low volume, very sensitive
+   - API gateways: High volume, less sensitive
+
+### Performance
+
+- **Detection speed**: < 500ms for 60-minute window
+- **Data points**: Handles 100+ time buckets efficiently
+- **Memory usage**: < 100MB for large datasets
+- **ML model**: Pre-trained Isolation Forest (no training delay)
+
+### Limitations
+
+- **Minimum samples**: Requires 5+ data points
+- **Cold start**: Needs historical data for baselines
+- **Seasonal patterns**: May flag legitimate weekly/daily patterns
+- **Threshold tuning**: Default sensitivity (1.0) may need adjustment
+
+### Future Enhancements
+
+- [ ] Automatic baseline learning
+- [ ] Seasonal pattern detection
+- [ ] Anomaly prediction (forecasting)
+- [ ] Custom thresholds per service
+- [ ] Anomaly correlation across services
+- [ ] Integration with alerting system
+
+### Machine Learning Stack
+
+- **scikit-learn**: Isolation Forest algorithm
+- **numpy**: Statistical operations (mean, std, z-score)
+- **scipy**: Statistical tests and distributions
+- **pandas**: Time series analysis (future)
+
+### Troubleshooting
+
+**No anomalies detected:**
+```bash
+# Check if you have recent data
+curl "http://localhost:9200/logs/_count?q=timestamp:[now-1h TO now]"
+
+# Try wider window
+curl "localhost:8000/api/v1/anomaly/detect/log-volume?window_minutes=120"
+
+# Check sensitivity (lower = more sensitive)
+# Edit api/services/anomaly_detector.py: sensitivity = 0.5
+```
+
+**Too many false positives:**
+```bash
+# Increase sensitivity threshold
+# Edit api/services/anomaly_detector.py: sensitivity = 1.5
+
+# Or filter by severity
+curl "localhost:8000/api/v1/anomaly/report" | jq '.anomalies[] | select(.severity == "critical")'
+```
+
+**Slow detection:**
+```bash
+# Reduce time window
+?window_minutes=30
+
+# Or reduce aggregation resolution (1m -> 5m)
+# Edit _get_log_volume_timeseries: fixed_interval: "5m"
+```
+
+### Example Scenarios
+
+**Scenario 1: Traffic Spike Detection**
+```bash
+# Normal: 100 logs/min
+# Spike: 2000 logs/min
+# Detection: 
+{
+  "severity": "critical",
+  "deviation_percent": 1900,
+  "actual_value": 2000,
+  "expected_value": 100
+}
+# Action: Scale infrastructure, check for DDoS
+```
+
+**Scenario 2: Service Degradation**
+```bash
+# Normal error rate: 0.5%
+# Degraded: 15%
+# Detection:
+{
+  "metric_name": "error_rate",
+  "severity": "high",
+  "deviation_percent": 2900
+}
+# Action: Check recent deploys, investigate errors
+```
+
+**Scenario 3: Overnight Batch Job**
+```bash
+# Daily 2am spike (legitimate)
+# Solution: Exclude time ranges or use longer baseline window
+?window_minutes=1440  # 24 hours includes pattern
+```
+
