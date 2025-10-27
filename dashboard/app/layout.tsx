@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "LogFlow - Distributed Log Aggregation",
-  description: "Real-time log monitoring and analytics platform",
+  title: "InsightForge - Distributed Log Analytics",
+  description: "Real-time log monitoring and analytics platform with ML-powered insights",
 };
 
 export default function RootLayout({

@@ -9,13 +9,13 @@ class Settings(BaseSettings):
     """Application settings"""
     
     # Application
-    APP_NAME: str = "LogFlow"
+    APP_NAME: str = "InsightForge"
     ENVIRONMENT: str = "development"
     
     # API
-    API_TITLE: str = "LogFlow API"
+    API_TITLE: str = "InsightForge API"
     API_VERSION: str = "1.0.0"
-    API_DESCRIPTION: str = "Distributed Log Aggregation System"
+    API_DESCRIPTION: str = "Distributed Log Aggregation & Analytics Platform"
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
     API_WORKERS: int = 4

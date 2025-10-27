@@ -1,4 +1,4 @@
-# LogFlow - Distributed Log Aggregation System
+# InsightForge - Distributed Log Aggregation System
 
 A production-grade distributed log aggregation and analysis platform built with Python, Kafka, Elasticsearch, and PostgreSQL.
 
@@ -8,7 +8,7 @@ A production-grade distributed log aggregation and analysis platform built with 
 
 ## 🎯 Overview
 
-LogFlow is a **real-time log aggregation system** that collects, processes, stores, and analyzes logs from multiple microservices. It features a RESTful API, intelligent alerting, caching, rate limiting, and full authentication - all containerized and production-ready.
+InsightForge is a **real-time log aggregation system** that collects, processes, stores, and analyzes logs from multiple microservices. It features a RESTful API, intelligent alerting, caching, rate limiting, and full authentication - all containerized and production-ready.
 
 ### Key Features
 
@@ -56,7 +56,7 @@ LogFlow is a **real-time log aggregation system** that collects, processes, stor
 ```bash
 # 1. Clone the repository
 git clone <your-repo-url>
-cd logflow
+cd insightforge
 
 # 2. Start all services
 ./scripts/start-all-docker.sh
@@ -530,7 +530,7 @@ curl http://localhost:9200/_cluster/health?pretty
 docker compose exec redis redis-cli INFO
 
 # PostgreSQL connections
-docker compose exec postgres psql -U logflow -d logflow \
+docker compose exec postgres psql -U insightforge -d insightforge \
   -c "SELECT count(*) FROM pg_stat_activity;"
 ```
 
@@ -540,7 +540,7 @@ docker compose exec postgres psql -U logflow -d logflow \
 
 ### Project Structure
 ```
-logflow/
+insightforge/
 ├── api/                      # REST API
 │   ├── routes/              # API endpoints
 │   ├── models/              # Pydantic & SQLAlchemy models
@@ -703,7 +703,7 @@ docker compose up -d api
 **4. Database connection issues**
 ```bash
 # Check PostgreSQL
-docker compose exec postgres psql -U logflow -d logflow -c "SELECT 1;"
+docker compose exec postgres psql -U insightforge -d insightforge -c "SELECT 1;"
 
 # Reinitialize
 ./scripts/manage-db.sh reset
@@ -730,7 +730,7 @@ docker compose logs -f api
 docker compose ps
 
 # Inspect container
-docker inspect logflow-api
+docker inspect insightforge-api
 ```
 
 ---
@@ -809,13 +809,13 @@ Built as a demonstration of:
 
 ---
 
-**🎉 LogFlow - Production-Ready Log Aggregation**
+**🎉 InsightForge - Production-Ready Log Aggregation**
 
 If you found this project helpful, please star the repository!
 
 ## 📊 Prometheus Metrics
 
-LogFlow exports metrics in Prometheus format for monitoring and observability.
+InsightForge exports metrics in Prometheus format for monitoring and observability.
 
 ### Metrics Endpoints
 
@@ -872,7 +872,7 @@ rate_limit_exceeded_total{endpoint}                    # Rate limits hit
 Add to your `prometheus.yml`:
 ```yaml
 scrape_configs:
-  - job_name: 'logflow'
+  - job_name: 'insightforge'
     static_configs:
       - targets: ['localhost:8000']
     metrics_path: '/metrics'
@@ -927,7 +927,7 @@ curl http://localhost:8000/metrics | grep http_requests_total
 
 ## 🔍 Request Tracing & Correlation
 
-LogFlow implements distributed request tracing to track requests across the system.
+InsightForge implements distributed request tracing to track requests across the system.
 
 ### Request IDs
 
@@ -1083,11 +1083,11 @@ curl -i -H "X-Correlation-ID: $CORR_ID" \
 
 ## 🤖 ML-Based Anomaly Detection
 
-LogFlow uses machine learning to automatically detect unusual patterns in your logs, helping you catch issues before they become critical.
+InsightForge uses machine learning to automatically detect unusual patterns in your logs, helping you catch issues before they become critical.
 
 ### Detection Algorithms
 
-LogFlow employs **three complementary methods** for robust anomaly detection:
+InsightForge employs **three complementary methods** for robust anomaly detection:
 
 1. **Z-Score (Statistical)**
    - Detects deviations from historical mean
@@ -1422,7 +1422,7 @@ curl "localhost:8000/api/v1/anomaly/report" | jq '.anomalies[] | select(.severit
 
 ## 💻 React Dashboard
 
-LogFlow includes a modern, responsive web dashboard built with **Next.js 14, React, and Tailwind CSS** for real-time log monitoring and analytics.
+InsightForge includes a modern, responsive web dashboard built with **Next.js 14, React, and Tailwind CSS** for real-time log monitoring and analytics.
 
 ### Features
 
@@ -1508,7 +1508,7 @@ dashboard/
 
 ### API Integration
 
-The dashboard connects to LogFlow API endpoints:
+The dashboard connects to InsightForge API endpoints:
 ```typescript
 // lib/api.ts
 
@@ -1720,7 +1720,7 @@ CMD ["npm", "start"]
 
 **Environment Variables for Production:**
 ```bash
-NEXT_PUBLIC_API_URL=https://api.logflow.io
+NEXT_PUBLIC_API_URL=https://api.insightforge.io
 NODE_ENV=production
 ```
 

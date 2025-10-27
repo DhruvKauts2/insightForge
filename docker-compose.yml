@@ -1,18 +1,18 @@
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    container_name: logflow-zookeeper
+    container_name: insightforge-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
     networks:
-      - logflow-network
+      - insightforge-network
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: logflow-kafka
+    container_name: insightforge-kafka
     depends_on:
       - zookeeper
     ports:
@@ -26,11 +26,11 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
-      - logflow-network
+      - insightforge-network
 
   elasticsearch:
     image: elasticsearch:8.11.1
-    container_name: logflow-elasticsearch
+    container_name: insightforge-elasticsearch
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -40,11 +40,11 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
     networks:
-      - logflow-network
+      - insightforge-network
 
   kibana:
     image: kibana:8.11.1
-    container_name: logflow-kibana
+    container_name: insightforge-kibana
     depends_on:
       - elasticsearch
     ports:
@@ -52,44 +52,44 @@ services:
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     networks:
-      - logflow-network
+      - insightforge-network
 
   postgres:
     image: postgres:16-alpine
-    container_name: logflow-postgres
+    container_name: insightforge-postgres
     environment:
-      POSTGRES_USER: logflow
-      POSTGRES_PASSWORD: logflow123
-      POSTGRES_DB: logflow
+      POSTGRES_USER: insightforge
+      POSTGRES_PASSWORD: insightforge123
+      POSTGRES_DB: insightforge
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-schema.sql:/docker-entrypoint-initdb.d/01-init-schema.sql
     networks:
-      - logflow-network
+      - insightforge-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U logflow -d logflow"]
+      test: ["CMD-SHELL", "pg_isready -U insightforge -d insightforge"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: logflow-redis
+    container_name: insightforge-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - logflow-network
+      - insightforge-network
     command: redis-server --appendonly yes
 
   api:
     build:
       context: .
       dockerfile: Dockerfile.api
-    container_name: logflow-api
+    container_name: insightforge-api
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,14 +100,14 @@ services:
     env_file:
       - .env.docker
     networks:
-      - logflow-network
+      - insightforge-network
     restart: unless-stopped
 
   alerting:
     build:
       context: .
       dockerfile: Dockerfile.alerting
-    container_name: logflow-alerting
+    container_name: insightforge-alerting
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,7 +116,7 @@ services:
     env_file:
       - .env.docker
     networks:
-      - logflow-network
+      - insightforge-network
     restart: unless-stopped
 
 volumes:
@@ -125,5 +125,5 @@ volumes:
   redis_data:
 
 networks:
-  logflow-network:
+  insightforge-network:
     driver: bridge
