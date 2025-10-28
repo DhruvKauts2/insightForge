@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -20,16 +22,14 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
       - insightforge-network
 
   elasticsearch:
-    image: elasticsearch:8.11.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
     container_name: insightforge-elasticsearch
     environment:
       - discovery.type=single-node
@@ -38,38 +38,30 @@ services:
     ports:
       - "9200:9200"
     volumes:
-      - es_data:/usr/share/elasticsearch/data
+      - elasticsearch-data:/usr/share/elasticsearch/data
     networks:
       - insightforge-network
-
-  kibana:
-    image: kibana:8.11.1
-    container_name: insightforge-kibana
-    depends_on:
-      - elasticsearch
-    ports:
-      - "5601:5601"
-    environment:
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-    networks:
-      - insightforge-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   postgres:
     image: postgres:16-alpine
     container_name: insightforge-postgres
     environment:
-      POSTGRES_USER: insightforge
-      POSTGRES_PASSWORD: insightforge123
-      POSTGRES_DB: insightforge
+      POSTGRES_USER: logflow
+      POSTGRES_PASSWORD: logflow123
+      POSTGRES_DB: logflow
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-schema.sql:/docker-entrypoint-initdb.d/01-init-schema.sql
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - insightforge-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U insightforge -d insightforge"]
+      test: ["CMD-SHELL", "pg_isready -U logflow"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -79,51 +71,54 @@ services:
     container_name: insightforge-redis
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
     networks:
       - insightforge-network
-    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: api/Dockerfile
     container_name: insightforge-api
     depends_on:
+      elasticsearch:
+        condition: service_healthy
       postgres:
         condition: service_healthy
-      elasticsearch:
+      redis:
+        condition: service_healthy
+      kafka:
         condition: service_started
     ports:
       - "8000:8000"
-    env_file:
-      - .env.docker
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=logflow
+      - POSTGRES_PASSWORD=logflow123
+      - POSTGRES_DB=logflow
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     networks:
       - insightforge-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
-
-  alerting:
-    build:
-      context: .
-      dockerfile: Dockerfile.alerting
-    container_name: insightforge-alerting
-    depends_on:
-      postgres:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_started
-    env_file:
-      - .env.docker
-    networks:
-      - insightforge-network
-    restart: unless-stopped
-
-volumes:
-  es_data:
-  postgres_data:
-  redis_data:
 
 networks:
   insightforge-network:
     driver: bridge
+
+volumes:
+  elasticsearch-data:
+  postgres-data:

@@ -130,39 +130,48 @@ async def root(request: Request):
     }
 
 
-@app.get("/health", response_model=HealthResponse, tags=["Health"])
-@limiter.exempt
+@app.get("/health")
+@limiter.limit("10/minute")
 async def health_check(request: Request):
     """Health check endpoint"""
-    es_health = es_client.health()
-    db_health = check_database_health()
-    redis_stats = redis_client.get_stats()
-    
-    services = {
-        "elasticsearch": es_health.get("status", "unknown"),
-        "database": db_health.get("status", "unknown"),
-        "redis": "healthy" if redis_stats.get("connected") else "unhealthy"
-    }
-    
-    overall_status = "healthy" if all(
-        status in ["healthy", "green", "yellow"] 
-        for status in services.values()
-    ) else "unhealthy"
-    
-    return HealthResponse(
-        status=overall_status,
-        timestamp=datetime.now().isoformat(),
-        services=services
-    )
+    try:
+        # Check Elasticsearch
+        es_healthy = es_client.health_check()
+        
+        # Check Redis
+        redis_healthy = redis_client.health_check()
+        
+        # Check Database
+        db_healthy = check_database_health()
+        
+        status = "healthy" if all([es_healthy, db_healthy]) else "degraded"
+        
+        return {
+            "status": status,
+            "services": {
+                "elasticsearch": "healthy" if es_healthy else "unhealthy",
+                "redis": "healthy" if redis_healthy else "unhealthy",
+                "database": "healthy" if db_healthy else "unhealthy"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
 
 
+
+
+# Startup
 if __name__ == "__main__":
     import uvicorn
-    
     logger.info(f"Starting API server on {API_HOST}:{API_PORT}")
     uvicorn.run(
         app,
         host=API_HOST,
         port=API_PORT,
-        log_level="info"
+        log_config=None
     )

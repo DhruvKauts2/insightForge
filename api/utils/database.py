@@ -1,85 +1,53 @@
 """
-Database connection and session management
+Database connection and utilities
 """
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, declarative_base
 from contextlib import contextmanager
+from typing import Generator
 from loguru import logger
-import sys
-from pathlib import Path
 
-# Add parent to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from api.models.database import Base
-from config import settings
+from api.config import settings
 
 # Database URL
-DATABASE_URL = f"postgresql://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
+DATABASE_URL = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
 
-# Create engine
+# Create SQLAlchemy engine
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    echo=False
+    pool_size=5,
+    max_overflow=10
 )
 
-# Create session factory
+# Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
-def init_db():
-    """Initialize database - create all tables"""
-    try:
-        logger.info("Creating database tables...")
-        Base.metadata.create_all(bind=engine)
-        logger.info("✅ Database tables created successfully")
-    except Exception as e:
-        logger.error(f"Failed to create database tables: {e}")
-        raise
-
-
-def drop_db():
-    """Drop all tables - use with caution!"""
-    logger.warning("Dropping all database tables...")
-    Base.metadata.drop_all(bind=engine)
-    logger.info("✅ Database tables dropped")
+# Base class for models
+Base = declarative_base()
 
 
 @contextmanager
-def get_db():
-    """
-    Get database session with context manager
-    """
-    db = SessionLocal()
+def get_db_session() -> Generator:
+    """Context manager for database sessions"""
+    session = SessionLocal()
     try:
-        yield db
-        db.commit()
+        yield session
+        session.commit()
     except Exception as e:
-        db.rollback()
-        raise e
+        session.rollback()
+        logger.error(f"Database error: {e}")
+        raise
     finally:
-        db.close()
+        session.close()
 
 
-def get_db_session() -> Session:
-    """
-    Get database session for dependency injection
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def check_database_health() -> dict:
+def check_database_health() -> bool:
     """Check if database is accessible"""
     try:
-        # Use text() for SQLAlchemy 2.0 compatibility
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-        return {"status": "healthy"}
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
-        return {"status": "unhealthy", "error": str(e)}
+        return False

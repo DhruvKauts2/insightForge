@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from api.models.database import User
 from api.models.auth import TokenData
 from api.utils.database import get_db_session
-from config import settings
+from api.config import settings
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -40,14 +40,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+        expire = datetime.utcnow() + timedelta(minutes=settings.Uaccess_token_expire_minutes)
     
     to_encode.update({"exp": expire})
     
     encoded_jwt = jwt.encode(
         to_encode,
-        settings.secret_key,
-        algorithm=settings.algorithm
+        settings.Usecret_key,
+        algorithm=settings.Ualgorithm
     )
     
     return encoded_jwt
@@ -80,8 +80,8 @@ async def get_current_user(
     try:
         payload = jwt.decode(
             token,
-            settings.secret_key,
-            algorithms=[settings.algorithm]
+            settings.Usecret_key,
+            algorithms=[settings.Ualgorithm]
         )
         username: str = payload.get("sub")
         user_id: int = payload.get("user_id")

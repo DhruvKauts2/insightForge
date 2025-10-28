@@ -1,119 +1,95 @@
 """
-Elasticsearch client with Prometheus metrics
+Elasticsearch client with retry logic
 """
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, exceptions
+from typing import Dict, Any, Tuple, Optional
 from loguru import logger
-import time
-from typing import Optional, Tuple, Dict, Any
 
-from config import settings
-from api.utils.prometheus_metrics import (
-    elasticsearch_queries_total,
-    elasticsearch_query_duration_seconds
-)
+from api.config import settings
 
 
 class ElasticsearchClient:
-    """Elasticsearch client wrapper with metrics"""
+    """Elasticsearch client with connection management"""
     
     def __init__(self):
-        self._client = None
-        self._connected = False
+        self.client: Optional[Elasticsearch] = None
+        self.index_pattern = settings.ES_INDEX_PATTERN
         self._initialize()
     
     def _initialize(self):
         """Initialize Elasticsearch connection"""
         try:
-            hosts = settings.elasticsearch_hosts.split(',')
-            self._client = Elasticsearch(hosts=hosts)
+            self.client = Elasticsearch(
+                [settings.ELASTICSEARCH_HOSTS],
+                request_timeout=30,
+                max_retries=3,
+                retry_on_timeout=True
+            )
             
             # Test connection
-            info = self._client.info()
-            self._connected = True
+            info = self.client.info()
             logger.info(f"✅ Connected to Elasticsearch {info['version']['number']}")
             
         except Exception as e:
             logger.error(f"Elasticsearch connection failed: {e}")
-            self._connected = False
+            self.client = None
     
-    def is_connected(self) -> bool:
-        """Check if Elasticsearch is connected"""
-        return self._connected
-    
-    def search(self, index: str, body: dict) -> Tuple[Dict[Any, Any], float]:
-        """
-        Search Elasticsearch with metrics
-        
-        Returns:
-            Tuple of (response, query_time_ms)
-        """
-        start_time = time.time()
+    def search(
+        self,
+        index: str,
+        body: Dict[str, Any],
+        size: Optional[int] = None
+    ) -> Tuple[Dict[str, Any], int]:
+        """Execute search query"""
+        if not self.client:
+            raise exceptions.ConnectionError("Elasticsearch not connected")
         
         try:
-            response = self._client.search(index=index, body=body)
-            query_time = (time.time() - start_time) * 1000  # Convert to ms
+            if size is not None:
+                body['size'] = size
             
-            # Record metrics
-            elasticsearch_queries_total.labels(operation='search').inc()
-            elasticsearch_query_duration_seconds.labels(operation='search').observe(time.time() - start_time)
+            response = self.client.search(index=index, body=body)
+            query_time = response.get('took', 0)
             
             return response, query_time
             
         except Exception as e:
             logger.error(f"Search error: {e}")
-            elasticsearch_queries_total.labels(operation='search_error').inc()
             raise
     
-    def index(self, index: str, document: dict, doc_id: Optional[str] = None):
-        """Index a document with metrics"""
-        start_time = time.time()
+    def index_document(
+        self,
+        index: str,
+        document: Dict[str, Any],
+        doc_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Index a document"""
+        if not self.client:
+            raise exceptions.ConnectionError("Elasticsearch not connected")
         
         try:
             if doc_id:
-                response = self._client.index(index=index, id=doc_id, document=document)
+                response = self.client.index(index=index, id=doc_id, document=document)
             else:
-                response = self._client.index(index=index, document=document)
-            
-            # Record metrics
-            elasticsearch_queries_total.labels(operation='index').inc()
-            elasticsearch_query_duration_seconds.labels(operation='index').observe(time.time() - start_time)
+                response = self.client.index(index=index, document=document)
             
             return response
             
         except Exception as e:
-            logger.error(f"Index error: {e}")
-            elasticsearch_queries_total.labels(operation='index_error').inc()
+            logger.error(f"Indexing error: {e}")
             raise
     
-    def get_by_id(self, index: str, doc_id: str) -> Optional[dict]:
-        """Get document by ID with metrics"""
-        start_time = time.time()
+    def health_check(self) -> bool:
+        """Check if Elasticsearch is healthy"""
+        if not self.client:
+            return False
         
         try:
-            response = self._client.get(index=index, id=doc_id)
-            
-            # Record metrics
-            elasticsearch_queries_total.labels(operation='get').inc()
-            elasticsearch_query_duration_seconds.labels(operation='get').observe(time.time() - start_time)
-            
-            return response
-            
+            health = self.client.cluster.health()
+            return health['status'] in ['yellow', 'green']
         except Exception as e:
-            logger.error(f"Get by ID error: {e}")
-            elasticsearch_queries_total.labels(operation='get_error').inc()
-            return None
-    
-    def health(self) -> dict:
-        """Get Elasticsearch health"""
-        if not self._connected:
-            return {"status": "disconnected"}
-        
-        try:
-            health = self._client.cluster.health()
-            return health
-        except Exception as e:
-            logger.error(f"Health check error: {e}")
-            return {"status": "error", "error": str(e)}
+            logger.error(f"Health check failed: {e}")
+            return False
 
 
 # Global Elasticsearch client instance

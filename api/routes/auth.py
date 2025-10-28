@@ -18,7 +18,7 @@ from api.utils.auth import (
     get_current_admin
 )
 from api.utils.rate_limiter import limiter
-from config import settings
+from api.config import settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -88,7 +88,7 @@ async def login(
         )
     
     # Create access token
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token_expires = timedelta(minutes=settings.Uaccess_token_expire_minutes)
     access_token = create_access_token(
         data={"sub": user.username, "user_id": user.id},
         expires_delta=access_token_expires
