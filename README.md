@@ -2,99 +2,97 @@
 
 > **Distributed Log Aggregation & Analytics Platform**
 
-A production-ready, scalable log management system with real-time analytics, ML-powered anomaly detection, and beautiful visualizations.
+A production-ready, scalable log management system with real-time analytics, ML-powered anomaly detection, and advanced visualizations.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-14.0+-black.svg)](https://nextjs.org/)
 
-![InsightForge Dashboard](https://via.placeholder.com/800x400?text=InsightForge+Dashboard)
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Quick Start](#quick-start)
+- [Components](#components)
+- [API Documentation](#api-documentation)
+- [Dashboard](#dashboard)
+- [Deployment](#deployment)
+- [Performance](#performance)
+- [Contributing](#contributing)
 
 ---
 
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Architecture](#-architecture)
-- [Tech Stack](#-tech-stack)
-- [Quick Start](#-quick-start)
-- [Components](#-components)
-- [API Documentation](#-api-documentation)
-- [Dashboard](#-dashboard)
-- [Deployment](#-deployment)
-- [Performance](#-performance)
-- [Contributing](#-contributing)
-
----
-
-## ✨ Features
+## Features
 
 ### Core Capabilities
-- **🚀 Real-time Log Ingestion** - High-throughput Kafka-based streaming
-- **🔍 Advanced Search** - Full-text search with filters and aggregations
-- **📊 Rich Visualizations** - Interactive charts and real-time graphs
-- **🤖 ML Anomaly Detection** - Multi-algorithm anomaly detection (Z-Score, Moving Average, Isolation Forest)
-- **📈 Metrics & Analytics** - Service health, error rates, log volume trends
-- **🔗 Distributed Tracing** - Correlation ID tracking across services
-- **🚨 Smart Alerting** - Rule-based alerts with webhooks
-- **⚡ High Performance** - Redis caching, optimized queries
-- **🔐 Production-Ready** - Security hardening, health checks, monitoring
+- **Real-time Log Ingestion** - High-throughput Kafka-based streaming
+- **Advanced Search** - Full-text search with filters and aggregations
+- **Rich Visualizations** - Interactive charts and real-time graphs
+- **ML Anomaly Detection** - Multi-algorithm anomaly detection (Z-Score, Moving Average, Isolation Forest)
+- **Metrics & Analytics** - Service health, error rates, log volume trends
+- **Distributed Tracing** - Correlation ID tracking across services
+- **Smart Alerting** - Rule-based alerts with webhooks
+- **High Performance** - Redis caching, optimized queries
+- **Production-Ready** - Security hardening, health checks, monitoring
 
 ### Technical Highlights
 - **Scalable Architecture** - Microservices with containerization
 - **Modern Stack** - FastAPI + Next.js + TypeScript
 - **Data Pipeline** - Kafka → Consumer → Elasticsearch
 - **Analytics Engine** - Real-time aggregations and time-series analysis
-- **Beautiful UI** - Responsive design with Tailwind CSS
+- **Responsive UI** - Tailwind CSS
 - **Developer Friendly** - Comprehensive API docs, type safety
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        InsightForge Platform                     │
-└─────────────────────────────────────────────────────────────────┘
++---------------------------------------------------------------+
+|                     InsightForge Platform                     |
++---------------------------------------------------------------+
 
-                    ┌──────────────┐
-                    │  Log Sources │
-                    │ (Apps/Svcs)  │
-                    └──────┬───────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │    Kafka     │◄─── High-throughput message queue
-                    │  (logs-raw)  │
-                    └──────┬───────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │   Consumer   │◄─── Processes & enriches logs
-                    │   (Python)   │
-                    └──────┬───────┘
-                           │
-                           ▼
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-        ▼                  ▼                  ▼
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│Elasticsearch │  │  PostgreSQL  │  │    Redis     │
-│  (Storage &  │  │  (Metadata)  │  │  (Caching)   │
-│   Search)    │  └──────────────┘  └──────────────┘
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│   FastAPI    │◄─── REST API + WebSockets
-│     API      │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│   Next.js    │◄─── Modern React dashboard
-│  Dashboard   │
-└──────────────┘
+                    +--------------+
+                    |  Log Sources |
+                    | (Apps/Svcs)  |
+                    +------+-------+
+                           |
+                           v
+                    +--------------+
+                    |    Kafka     |<--- High-throughput message queue
+                    |  (logs-raw)  |
+                    +------+-------+
+                           |
+                           v
+                    +--------------+
+                    |   Consumer   |<--- Processes & enriches logs
+                    |   (Python)   |
+                    +------+-------+
+                           |
+                           v
+        +------------------+-----------------+
+        |                  |                 |
+        v                  v                 v
++--------------+  +--------------+  +--------------+
+|Elasticsearch |  |  PostgreSQL  |  |    Redis     |
+|  (Storage &  |  |  (Metadata)  |  |  (Caching)   |
+|   Search)    |  +--------------+  +--------------+
++------+-------+
+       |
+       v
++--------------+
+|   FastAPI    |<--- REST API + WebSockets
+|     API      |
++------+-------+
+       |
+       v
++--------------+
+|   Next.js    |<--- Modern React dashboard
+|  Dashboard   |
++--------------+
 ```
 
 ### Data Flow
@@ -108,7 +106,7 @@ A production-ready, scalable log management system with real-time analytics, ML-
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend
 | Technology | Version | Purpose |
@@ -145,7 +143,7 @@ A production-ready, scalable log management system with real-time analytics, ML-
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -176,11 +174,11 @@ npm run dev
 ```
 
 **Access:**
-- 📊 **Dashboard**: http://localhost:3000
-- 🔌 **API**: http://localhost:8000
-- 📚 **API Docs**: http://localhost:8000/docs
-- 🔍 **Elasticsearch**: http://localhost:9200
-- 📈 **Metrics**: http://localhost:8000/metrics
+- **Dashboard**: http://localhost:3000
+- **API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Elasticsearch**: http://localhost:9200
+- **Metrics**: http://localhost:8000/metrics
 
 ### Option 2: Manual Setup
 
@@ -241,7 +239,7 @@ python3 log_generator/generator.py
 
 ---
 
-## 📦 Components
+## Components
 
 ### 1. API Service (`api/`)
 
@@ -338,7 +336,7 @@ python3 log_generator/generator.py --rate 100 --duration 600
 
 ---
 
-## 📖 API Documentation
+## API Documentation
 
 ### Health Check
 ```bash
@@ -426,7 +424,7 @@ GET /api/v1/anomaly/detect/log-volume?window_minutes=60
 
 ---
 
-## 💻 Dashboard
+## Dashboard
 
 ### Features
 
@@ -456,44 +454,44 @@ GET /api/v1/anomaly/detect/log-volume?window_minutes=60
 - Hover effects
 - Pagination (ready)
 
-### Screenshots
+### Layout
 
 **Main Dashboard:**
 ```
-┌─────────────────────────────────────────────────────────┐
-│  InsightForge                             🟢 Live       │
-├─────────────────────────────────────────────────────────┤
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  │
-│  │ Total   │  │ Logs/   │  │ Active  │  │ Error   │  │
-│  │ Logs    │  │ Minute  │  │ Services│  │ Rate    │  │
-│  │ 1.2M    │  │ 65.0    │  │ 5       │  │ 5.2%    │  │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘  │
-│                                                         │
-│  ┌──────────────────────┐  ┌──────────────────────┐  │
-│  │ Log Volume Over Time │  │ Service Metrics      │  │
-│  │    [Line Chart]      │  │   [Bar Chart]        │  │
-│  └──────────────────────┘  └──────────────────────┘  │
-│                                                         │
-│  ┌──────────────────────┐  ┌──────────────────────┐  │
-│  │ Log Level Dist.      │  │ Detected Anomalies   │  │
-│  │    [Pie Chart]       │  │   [Anomaly Cards]    │  │
-│  └──────────────────────┘  └──────────────────────┘  │
-│                                                         │
-│  [Search Bar with Filters]                             │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │ Recent Logs Table                                │  │
-│  │ Time     Level    Service    Message    Corr.  │  │
-│  │ ------------------------------------------------ │  │
-│  │ 12:00    ERROR    payment    Failed...  abc1   │  │
-│  │ 12:01    INFO     auth       Login...   abc2   │  │
-│  └─────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
++---------------------------------------------------------+
+|  InsightForge                              Live         |
++---------------------------------------------------------+
+|  +---------+  +---------+  +---------+  +---------+  |
+|  | Total   |  | Logs/   |  | Active  |  | Error   |  |
+|  | Logs    |  | Minute  |  | Services|  | Rate    |  |
+|  | 1.2M    |  | 65.0    |  | 5       |  | 5.2%    |  |
+|  +---------+  +---------+  +---------+  +---------+  |
+|                                                         |
+|  +----------------------+  +----------------------+  |
+|  | Log Volume Over Time |  | Service Metrics      |  |
+|  |    [Line Chart]      |  |   [Bar Chart]        |  |
+|  +----------------------+  +----------------------+  |
+|                                                         |
+|  +----------------------+  +----------------------+  |
+|  | Log Level Dist.      |  | Detected Anomalies   |  |
+|  |    [Pie Chart]       |  |   [Anomaly Cards]    |  |
+|  +----------------------+  +----------------------+  |
+|                                                         |
+|  [Search Bar with Filters]                             |
+|                                                         |
+|  +-------------------------------------------------+  |
+|  | Recent Logs Table                                |  |
+|  | Time     Level    Service    Message    Corr.  |  |
+|  | ------------------------------------------------ |  |
+|  | 12:00    ERROR    payment    Failed...  abc1   |  |
+|  | 12:01    INFO     auth       Login...   abc2   |  |
+|  +-------------------------------------------------+  |
++---------------------------------------------------------+
 ```
 
 ---
 
-## 🚢 Deployment
+## Deployment
 
 ### Docker Production Build
 ```bash
@@ -561,7 +559,7 @@ docker compose up -d --scale consumer=2
 
 ---
 
-## 📊 Performance
+## Performance
 
 ### Benchmarks
 
@@ -595,18 +593,18 @@ docker compose up -d --scale consumer=2
 
 ---
 
-## 🔒 Security
+## Security
 
 ### Implemented
 
-- ✅ Non-root Docker containers
-- ✅ Input validation (Pydantic)
-- ✅ SQL injection protection (SQLAlchemy)
-- ✅ XSS protection (React)
-- ✅ CORS configuration
-- ✅ Rate limiting
-- ✅ Health checks
-- ✅ Structured logging
+- Non-root Docker containers
+- Input validation (Pydantic)
+- SQL injection protection (SQLAlchemy)
+- XSS protection (React)
+- CORS configuration
+- Rate limiting
+- Health checks
+- Structured logging
 
 ### Production Recommendations
 
@@ -621,7 +619,7 @@ docker compose up -d --scale consumer=2
 
 ---
 
-## 📈 Monitoring
+## Monitoring
 
 ### Metrics Exposed
 
@@ -650,7 +648,7 @@ docker compose up -d --scale consumer=2
 
 ---
 
-## 🧪 Testing
+## Testing
 ```bash
 # Run tests (when implemented)
 pytest
@@ -664,9 +662,9 @@ locust -f tests/load_test.py
 
 ---
 
-## 🛣️ Roadmap
+## Roadmap
 
-### Completed ✅
+### Completed
 - [x] Real-time log ingestion
 - [x] Full-text search
 - [x] ML anomaly detection
@@ -675,12 +673,12 @@ locust -f tests/load_test.py
 - [x] Docker optimization
 - [x] Production-ready API
 
-### In Progress 🚧
+### In Progress
 - [ ] Kubernetes deployment
 - [ ] CI/CD pipeline
 - [ ] Authentication & authorization
 
-### Planned 📋
+### Planned
 - [ ] Advanced alerting (Slack, Email, PagerDuty)
 - [ ] Log retention policies
 - [ ] Custom dashboard builder
@@ -693,7 +691,7 @@ locust -f tests/load_test.py
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
@@ -726,13 +724,13 @@ pytest
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 👏 Acknowledgments
+## Acknowledgments
 
 - FastAPI for the amazing web framework
 - Elasticsearch for powerful search capabilities
@@ -742,25 +740,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📞 Support
+## Support
 
 - **Documentation**: [docs.insightforge.io](https://docs.insightforge.io)
 - **Issues**: [GitHub Issues](https://github.com/yourusername/insightforge/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/yourusername/insightforge/discussions)
 - **Email**: support@insightforge.io
-
----
-
-## 🌟 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/insightforge&type=Date)](https://star-history.com/#yourusername/insightforge&Date)
-
----
-
-<p align="center">
-  Made with ❤️ by the InsightForge Team
-</p>
-
-<p align="center">
-  <a href="#insightforge">Back to top ⬆️</a>
-</p>
